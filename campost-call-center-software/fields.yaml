@@ -1,0 +1,131 @@
+topic: "Campost (Cameroon Postal Services) Call Center Software"
+
+fields:
+  basic_info:
+    name:
+      description: "Solution name"
+      detail_level: brief
+    type:
+      description: "Cloud / On-premise / Hybrid / Open-source"
+      detail_level: brief
+    company:
+      description: "Vendor/developer name and headquarters"
+      detail_level: brief
+    pricing_model:
+      description: "Per-agent, per-minute, one-time license, free/open-source, pricing tiers"
+      detail_level: moderate
+    year_founded:
+      description: "Year the product/company was founded"
+      detail_level: brief
+
+  core_call_center_features:
+    inbound_calls:
+      description: "IVR (Interactive Voice Response), ACD (Automatic Call Distribution), call queuing capabilities"
+      detail_level: detailed
+    outbound_calls:
+      description: "Predictive dialer, campaign management, outbound capabilities"
+      detail_level: moderate
+    omnichannel:
+      description: "Supported channels: Voice, SMS, Email, WhatsApp, Webchat, Social Media, USSD"
+      detail_level: detailed
+    call_recording:
+      description: "Recording, playback, storage, and compliance features"
+      detail_level: moderate
+    ticketing:
+      description: "Issue tracking, escalation workflows, SLA management"
+      detail_level: moderate
+    citizen_self_service_ivr:
+      description: "Automated IVR for common queries (track package, post office hours, postal rates) without agent involvement"
+      detail_level: detailed
+    callback_queue_management:
+      description: "Ability to offer callbacks instead of hold queues to reduce telephony costs"
+      detail_level: moderate
+    agent_knowledge_base:
+      description: "Built-in knowledge base for agents covering procedures and FAQs in FR/EN"
+      detail_level: moderate
+
+  campost_integration:
+    package_tracking_integration:
+      description: "Ability to integrate with postal tracking systems (UPU IPS)"
+      detail_level: detailed
+    campostmoney_integration:
+      description: "Ability to integrate with CampostMoney/CAMO digital banking platform (Sixgoldtech)"
+      detail_level: detailed
+    ussd_channel_integration:
+      description: "Integration with Campost's NPSI #237# USSD platform for customer self-service without internet"
+      detail_level: detailed
+    bolamba_ecommerce_integration:
+      description: "Readiness to integrate with Campost's upcoming Bolamba e-commerce platform (launching 2026)"
+      detail_level: moderate
+    ips_ups_tracking_integration:
+      description: "Compatibility with UPU International Postal System (IPS) for real-time parcel/mail tracking"
+      detail_level: detailed
+
+  telecom_and_connectivity:
+    minimum_bandwidth_requirement:
+      description: "Minimum internet bandwidth needed per agent (Mbps). Cameroon: 20-25 Mbps urban, 5-10 Mbps rural"
+      detail_level: detailed
+    gsm_sip_trunk_support:
+      description: "Support for GSM gateways and local SIP trunking with MTN Cameroon, Orange Cameroon, or CAMTEL"
+      detail_level: detailed
+    offline_fallback_mode:
+      description: "Whether agents can continue working during internet outages (logging tickets, viewing history)"
+      detail_level: moderate
+    low_bandwidth_optimization:
+      description: "Features for bandwidth-constrained environments: codec selection, compressed audio, data caching"
+      detail_level: detailed
+
+  technical_considerations:
+    deployment:
+      description: "Deployment options: cloud, on-premise (Campost data center), hybrid"
+      detail_level: detailed
+    api_integrations:
+      description: "REST APIs, webhook support, SDK availability for custom integrations"
+      detail_level: detailed
+    scalability:
+      description: "Number of concurrent agents supported, growth capacity"
+      detail_level: moderate
+    multi_site_support:
+      description: "Ability to connect agents across 234 post offices + HQ, distributed deployment"
+      detail_level: detailed
+    mobile_agent_app:
+      description: "Whether agents can handle calls/tickets from mobile devices (smartphones/tablets)"
+      detail_level: moderate
+    power_outage_resilience:
+      description: "UPS/battery backup compatibility and graceful degradation during power interruptions"
+      detail_level: moderate
+
+  regulatory_and_compliance:
+    cameroon_data_protection_compliance:
+      description: "Compliance with Cameroon's Law No. 2024/017 on personal data protection (effective June 23, 2026)"
+      detail_level: detailed
+    cemac_financial_regulation:
+      description: "Compliance with COBAC Regulation No. 01/20 on consumer protection for banking services in CEMAC"
+      detail_level: detailed
+    data_residency_options:
+      description: "Where customer data and call recordings are stored: local (Cameroon/Africa), EU, or US"
+      detail_level: detailed
+    multilingual_support:
+      description: "French & English interface, IVR, and reporting (Cameroon is bilingual)"
+      detail_level: moderate
+
+  business_factors:
+    total_cost:
+      description: "Estimated implementation cost + yearly running cost in FCFA/USD"
+      detail_level: detailed
+    currency_support_fcfa:
+      description: "Native support for FCFA (XAF) currency in billing, reporting, and financial dashboards"
+      detail_level: moderate
+    implementation_time:
+      description: "Timeline to deploy (weeks/months)"
+      detail_level: moderate
+    local_partner_ecosystem:
+      description: "Local implementation partners, resellers, or system integrators in Cameroon/Central Africa"
+      detail_level: detailed
+    training_complexity:
+      description: "Ease of training call center agents, documentation quality, onboarding time"
+      detail_level: moderate
+
+uncertain:
+  # Auto-filled during deep research phase
+  []

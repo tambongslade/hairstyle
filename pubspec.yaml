@@ -1,0 +1,35 @@
+name: hairstyle
+description: "LIS Beauty — Virtual Try-On & Booking"
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.10.8
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_fonts: ^6.2.1
+  cached_network_image: ^3.4.1
+  flutter_cache_manager: ^3.4.1
+  smooth_page_indicator: ^1.2.0+3
+  image_picker: ^1.1.2
+  http: ^1.2.2
+  path_provider: ^2.1.5
+  shared_preferences: ^2.3.4
+  intl: ^0.19.0
+  socket_io_client: ^3.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+    - assets/onbaordinai.jpeg
+    - assets/onboarding3.jpeg
+    - assets/hairstyles/
+    - assets/hairstyles/MEN/

@@ -1,0 +1,106 @@
+topic: "Campost (Cameroon Postal Services) Call Center Software"
+description: >
+  Research and evaluation of call center software solutions for Campost's
+  appel d'offres. Campost operates 234 post offices across Cameroon, a $52M
+  data center in Yaounde, the CampostMoney digital banking platform, the NPSI
+  #237# USSD payment platform, and the upcoming Bolamba e-commerce platform.
+  Solutions must consider Cameroon's bilingual (FR/EN) context, variable internet
+  connectivity, mobile-dominant telecom (MTN, Orange), FCFA currency, and new
+  data protection law (Law No. 2024/017, effective June 2026).
+
+items:
+  # Enterprise Cloud Platforms
+  - name: "Genesys Cloud CX"
+    description: "Leading cloud contact center platform with omnichannel support"
+    category: "Enterprise Cloud"
+
+  - name: "Five9"
+    description: "Cloud contact center with AI-powered routing and analytics"
+    category: "Enterprise Cloud"
+
+  - name: "NICE CXone Mpower"
+    description: "Enterprise CCaaS with first African data centers (South Africa, Dec 2025)"
+    category: "Enterprise Cloud"
+
+  - name: "Talkdesk"
+    description: "Cloud-native AI-powered contact center with government deployments"
+    category: "Enterprise Cloud"
+
+  # Mid-Market / SMB Cloud
+  - name: "Freshdesk Contact Center (Freshcaller)"
+    description: "Affordable cloud-based call center by Freshworks"
+    category: "Mid-Market Cloud"
+
+  - name: "Zendesk Talk"
+    description: "Integrated voice solution within Zendesk's support suite"
+    category: "Mid-Market Cloud"
+
+  - name: "Zoho Desk + Zoho Voice"
+    description: "Integrated helpdesk and telephony, $7/user/month, French support, free tier"
+    category: "Mid-Market Cloud"
+
+  # Africa-Focused Solutions
+  - name: "PressOne Africa"
+    description: "Africa-native cloud call center (Nigeria), works on 3 Mbps bandwidth"
+    category: "Africa-Focused"
+
+  - name: "HelloDuty"
+    description: "Africa-built cloud call center (Kenya), zero-code IVR builder"
+    category: "Africa-Focused"
+
+  - name: "Ameyo (by Exotel)"
+    description: "Omnichannel contact center with African presence, French support, cloud + on-premise"
+    category: "Africa-Focused"
+
+  - name: "HoduCC (by HoduSoft)"
+    description: "Affordable omnichannel contact center, deployed in Nigeria (GUO Transport)"
+    category: "Africa-Focused"
+
+  # Programmable / CPaaS
+  - name: "Twilio Flex"
+    description: "Programmable cloud contact center platform"
+    category: "CPaaS"
+
+  - name: "CM.com"
+    description: "Dutch CPaaS with WhatsApp Business API, voice, SMS, chatbots, active in Africa"
+    category: "CPaaS"
+
+  # On-Premise / Open Source
+  - name: "Asterisk"
+    description: "Open-source PBX/call center framework, highly customizable"
+    category: "Open Source"
+
+  - name: "Vicidial"
+    description: "Open-source contact center suite built on Asterisk"
+    category: "Open Source"
+
+  - name: "Issabel"
+    description: "Open-source unified comms (Asterisk fork), French community, modern UI"
+    category: "Open Source"
+
+  - name: "3CX"
+    description: "Software-based PBX with call center features, on-premise option"
+    category: "On-Premise"
+
+  # Postal-Specific / ERP
+  - name: "UPU Postal Technology Centre (PTC) Solutions"
+    description: "UPU's IPS/IFS systems, Campost is already a UPU member, SaaS or on-premise"
+    category: "Postal-Specific"
+
+  - name: "Odoo VoIP + Helpdesk"
+    description: "Open-source ERP with integrated call/helpdesk modules"
+    category: "ERP-Integrated"
+
+  # Specialized
+  - name: "Contaque"
+    description: "Omni-channel contact center with GSM-based calling, ideal for mobile-dominant markets"
+    category: "Specialized"
+
+  - name: "Custom-built Solution"
+    description: "Tailor-made call center software for Campost's specific needs, leveraging existing data center"
+    category: "Custom"
+
+execution:
+  batch_size: 7
+  items_per_agent: 3
+  output_dir: "./campost-call-center-software/results"

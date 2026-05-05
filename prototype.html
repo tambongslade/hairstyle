@@ -1,0 +1,1786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fit — Virtual Try-On & Booking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0a0a0a;
+  
+  --bg-card: rgba(255,255,255,0.04);
+  --bg-glass: rgba(255,255,255,0.06);
+  --bg-glass-strong: rgba(255,255,255,0.10);
+  --gold: #c8a44e;
+  --gold-light: #e2c675;
+  --gold-dim: rgba(200,164,78,0.15);
+  --gold-glow: rgba(200,164,78,0.3);
+  --text-primary: #f0ece4;
+  --text-secondary: rgba(240,236,228,0.55);
+  --text-tertiary: rgba(240,236,228,0.3);
+  --accent-green: #4ecb8d;
+  --accent-red: #e05555;
+  --accent-blue: #5b8cf0;
+  --border: rgba(255,255,255,0.06);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-xs: 6px;
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'DM Sans', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --safe-top: 54px;
+  --safe-bottom: 34px;
+  --tab-height: 64px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body {
+  height:100%;
+  background:#000;
+  font-family:var(--font-body);
+  color:var(--text-primary);
+  overflow:hidden;
+}
+
+/* Phone Frame */
+.phone-frame {
+  position:relative;
+  width:390px;
+  height:844px;
+  margin:20px auto;
+  background:var(--bg-primary);
+  border-radius:44px;
+  overflow:hidden;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.08), 0 40px 100px rgba(0,0,0,0.8);
+}
+@media (max-width:430px) {
+  .phone-frame { width:100%; height:100vh; margin:0; border-radius:0; box-shadow:none; }
+}
+
+/* Status Bar */
+.status-bar {
+  position:absolute; top:0; left:0; right:0; z-index:100;
+  height:var(--safe-top); padding:14px 28px 0;
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:14px; font-weight:600;
+  background:linear-gradient(to bottom, var(--bg-primary) 60%, transparent);
+}
+.status-bar .time { font-variant-numeric:tabular-nums; }
+.status-icons { display:flex; gap:6px; align-items:center; }
+.status-icons svg { width:16px; height:16px; fill:var(--text-primary); }
+
+/* Screen Container */
+.screen-container {
+  position:absolute; top:0; left:0; right:0; bottom:0;
+  overflow:hidden;
+}
+.screen {
+  position:absolute; top:0; left:0; right:0; bottom:0;
+  overflow-y:auto; overflow-x:hidden;
+  padding-top:var(--safe-top);
+  padding-bottom:calc(var(--tab-height) + var(--safe-bottom) + 10px);
+  opacity:0; transform:translateY(20px) scale(0.97);
+  transition:all 0.45s cubic-bezier(0.16,1,0.3,1);
+  pointer-events:none;
+  scrollbar-width:none;
+}
+.screen::-webkit-scrollbar { display:none; }
+.screen.active {
+  opacity:1; transform:translateY(0) scale(1);
+  pointer-events:auto;
+}
+
+/* Bottom Tab Bar — Liquid Glass (iOS 26) */
+.tab-bar {
+  position:absolute; bottom:0; left:0; right:0; z-index:100;
+  padding:8px 16px calc(var(--safe-bottom) - 10px);
+}
+.tab-bar-inner {
+  display:flex; justify-content:space-around; align-items:center;
+  /* Liquid glass layered background */
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.06) 100%);
+  /* Specular edge borders — brighter top-left, dimmer bottom-right */
+  border-top:0.5px solid rgba(255,255,255,0.35);
+  border-left:0.5px solid rgba(255,255,255,0.2);
+  border-right:0.5px solid rgba(255,255,255,0.08);
+  border-bottom:0.5px solid rgba(255,255,255,0.05);
+  border-radius:28px;
+  padding:5px 6px;
+  /* Backdrop blur — the core glass effect */
+  backdrop-filter:blur(14px) saturate(180%);
+  -webkit-backdrop-filter:blur(14px) saturate(180%);
+  /* Outer shadow + inner light */
+  box-shadow:
+    0 8px 20px rgba(0,0,0,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    inset 0 -0.5px 0 rgba(255,255,255,0.03);
+}
+.tab-item {
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  padding:8px 4px 6px;
+  border-radius:22px;
+  cursor:pointer;
+  transition:all 0.35s cubic-bezier(0.16,1,0.3,1);
+  position:relative;
+}
+.tab-item svg { width:22px; height:22px; transition:all 0.35s cubic-bezier(0.16,1,0.3,1); }
+.tab-item .tab-label {
+  font-size:10px; font-weight:500; letter-spacing:0.2px;
+  color:var(--text-tertiary);
+  transition:all 0.35s cubic-bezier(0.16,1,0.3,1);
+}
+.tab-item svg path, .tab-item svg circle, .tab-item svg rect, .tab-item svg line, .tab-item svg polyline {
+  stroke:var(--text-tertiary); transition:all 0.35s cubic-bezier(0.16,1,0.3,1);
+}
+.tab-item.active {
+  /* Inner glass bubble with gold glow */
+  background:rgba(255,255,255,0.10);
+  border:0.5px solid rgba(255,255,255,0.18);
+  box-shadow:
+    0 0 12px rgba(200,164,78,0.15),
+    inset 0 0.5px 0 rgba(255,255,255,0.12);
+  transform:scale(1.08);
+}
+.tab-item.active svg path, .tab-item.active svg circle, .tab-item.active svg rect, .tab-item.active svg line, .tab-item.active svg polyline {
+  stroke:var(--gold);
+}
+.tab-item.active .tab-label { color:var(--gold); font-weight:600; }
+.tab-item .tab-dot {
+  position:absolute; top:2px; right:calc(50% - 18px);
+  width:5px; height:5px; border-radius:50%; background:var(--gold);
+  opacity:0; transform:scale(0);
+  transition:all 0.35s cubic-bezier(0.16,1,0.3,1);
+  box-shadow:0 0 4px rgba(200,164,78,0.6);
+}
+.tab-item.active .tab-dot { opacity:1; transform:scale(1); }
+
+/* Common Styles */
+.section-header {
+  display:flex; justify-content:space-between; align-items:baseline;
+  padding:0 20px; margin-bottom:14px;
+}
+.section-title {
+  font-family:var(--font-display); font-size:20px; font-weight:600;
+  letter-spacing:-0.3px;
+}
+.section-link {
+  font-size:12px; color:var(--gold); font-weight:500;
+  cursor:pointer; letter-spacing:0.3px;
+}
+.pill {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:6px 14px; border-radius:20px;
+  font-size:12px; font-weight:500;
+  background:var(--bg-glass); border:1px solid var(--border);
+  color:var(--text-secondary);
+  cursor:pointer; transition:all 0.25s ease;
+  white-space:nowrap;
+}
+.pill.active, .pill:hover {
+  background:var(--gold-dim); border-color:rgba(200,164,78,0.3);
+  color:var(--gold);
+}
+.gold-btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:14px 28px; border-radius:14px;
+  background:linear-gradient(135deg, var(--gold), #b8943e);
+  color:#0a0a0a; font-weight:600; font-size:15px;
+  border:none; cursor:pointer;
+  transition:all 0.3s ease;
+  box-shadow:0 4px 20px rgba(200,164,78,0.3);
+  letter-spacing:0.2px;
+}
+.gold-btn:hover { transform:translateY(-1px); box-shadow:0 6px 30px rgba(200,164,78,0.4); }
+.gold-btn:active { transform:scale(0.97); }
+.outline-btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:12px 24px; border-radius:12px;
+  background:transparent; border:1px solid rgba(200,164,78,0.3);
+  color:var(--gold); font-weight:500; font-size:14px;
+  cursor:pointer; transition:all 0.3s ease;
+}
+.outline-btn:hover { background:var(--gold-dim); }
+.glass-card {
+  background:var(--bg-glass);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+}
+
+/* ===================== HOME SCREEN ===================== */
+.home-header {
+  padding:10px 20px 0;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.home-logo {
+  font-family:var(--font-display); font-size:28px; font-weight:700;
+  background:linear-gradient(135deg, var(--gold-light), var(--gold));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  letter-spacing:-0.5px;
+}
+.home-header-actions { display:flex; gap:10px; align-items:center; }
+.lang-toggle {
+  padding:5px 10px; border-radius:8px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  font-size:11px; font-weight:600; color:var(--text-secondary);
+  cursor:pointer; letter-spacing:0.5px;
+}
+.notif-btn {
+  width:36px; height:36px; border-radius:10px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; position:relative;
+}
+.notif-btn svg { width:18px; height:18px; }
+.notif-btn svg path { stroke:var(--text-secondary); }
+.notif-dot {
+  position:absolute; top:6px; right:6px;
+  width:7px; height:7px; border-radius:50%;
+  background:var(--accent-red); border:2px solid var(--bg-primary);
+}
+
+.home-greeting {
+  padding:20px 20px 6px;
+  font-size:14px; color:var(--text-secondary); font-weight:400;
+}
+.home-greeting strong { color:var(--text-primary); font-weight:600; }
+
+/* Hero Card */
+.hero-card {
+  margin:14px 20px 0; border-radius:20px; overflow:hidden;
+  position:relative; height:200px;
+}
+.hero-card img {
+  width:100%; height:100%; object-fit:cover;
+  filter:brightness(0.5);
+}
+.hero-overlay {
+  position:absolute; bottom:0; left:0; right:0;
+  padding:20px;
+  background:linear-gradient(to top, rgba(0,0,0,0.9) 20%, transparent);
+}
+.hero-tag {
+  display:inline-block; padding:4px 10px; border-radius:6px;
+  background:rgba(200,164,78,0.2); color:var(--gold);
+  font-size:10px; font-weight:600; letter-spacing:0.8px;
+  text-transform:uppercase; margin-bottom:8px;
+}
+.hero-overlay h2 {
+  font-family:var(--font-display); font-size:22px; font-weight:600;
+  line-height:1.2; margin-bottom:4px;
+}
+.hero-overlay p { font-size:12px; color:var(--text-secondary); }
+
+/* Quick Actions */
+.quick-actions {
+  display:grid; grid-template-columns:1fr 1fr; gap:12px;
+  padding:20px 20px 0;
+}
+.quick-action {
+  padding:18px 16px; border-radius:var(--radius);
+  background:var(--bg-glass); border:1px solid var(--border);
+  cursor:pointer; transition:all 0.3s ease;
+  position:relative; overflow:hidden;
+}
+.quick-action:hover { border-color:rgba(200,164,78,0.2); transform:translateY(-2px); }
+.quick-action .qa-icon {
+  width:40px; height:40px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  margin-bottom:12px;
+}
+.quick-action:first-child .qa-icon { background:linear-gradient(135deg, rgba(200,164,78,0.2), rgba(200,164,78,0.05)); }
+.quick-action:last-child .qa-icon { background:linear-gradient(135deg, rgba(91,140,240,0.2), rgba(91,140,240,0.05)); }
+.quick-action .qa-icon svg { width:20px; height:20px; }
+.quick-action h3 { font-size:15px; font-weight:600; margin-bottom:4px; }
+.quick-action p { font-size:11px; color:var(--text-secondary); line-height:1.4; }
+.quick-action .qa-arrow {
+  position:absolute; top:16px; right:16px;
+  color:var(--text-tertiary); font-size:16px;
+}
+
+/* Points Banner */
+.points-banner {
+  margin:20px 20px 0; padding:16px 18px;
+  border-radius:var(--radius);
+  background:linear-gradient(135deg, rgba(200,164,78,0.12), rgba(200,164,78,0.03));
+  border:1px solid rgba(200,164,78,0.15);
+  display:flex; align-items:center; gap:14px;
+  cursor:pointer; transition:all 0.3s ease;
+}
+.points-banner:hover { border-color:rgba(200,164,78,0.3); }
+.points-icon {
+  width:44px; height:44px; border-radius:12px;
+  background:linear-gradient(135deg, var(--gold), #b8943e);
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.points-icon svg { width:22px; height:22px; }
+.points-info { flex:1; }
+.points-info .pts-label { font-size:11px; color:var(--text-secondary); margin-bottom:2px; }
+.points-info .pts-value { font-size:22px; font-weight:700; letter-spacing:-0.5px; }
+.points-info .pts-value span { font-size:12px; color:var(--gold); font-weight:500; margin-left:6px; }
+.pts-tier {
+  padding:5px 12px; border-radius:8px;
+  background:rgba(200,164,78,0.15);
+  font-size:11px; font-weight:600; color:var(--gold);
+  letter-spacing:0.5px;
+}
+
+/* Trending Styles */
+.trending-scroll {
+  display:flex; gap:12px; padding:0 20px;
+  overflow-x:auto; scrollbar-width:none;
+}
+.trending-scroll::-webkit-scrollbar { display:none; }
+.trending-card {
+  flex-shrink:0; width:140px; cursor:pointer;
+  transition:all 0.3s ease;
+}
+.trending-card:hover { transform:translateY(-4px); }
+.trending-img {
+  width:140px; height:175px; border-radius:14px;
+  overflow:hidden; position:relative;
+  margin-bottom:10px;
+}
+.trending-img img { width:100%; height:100%; object-fit:cover; }
+.trending-badge {
+  position:absolute; top:8px; left:8px;
+  padding:3px 8px; border-radius:6px;
+  background:rgba(200,164,78,0.9); color:#0a0a0a;
+  font-size:9px; font-weight:700; letter-spacing:0.5px;
+  text-transform:uppercase;
+}
+.trending-card h4 { font-size:13px; font-weight:600; margin-bottom:2px; }
+.trending-card p { font-size:11px; color:var(--text-secondary); }
+
+/* ===================== TRY-ON SCREEN ===================== */
+.tryon-header {
+  padding:10px 20px 0;
+  text-align:center;
+}
+.tryon-header h1 {
+  font-family:var(--font-display); font-size:24px; font-weight:600;
+  margin-bottom:4px;
+}
+.tryon-header p { font-size:12px; color:var(--text-secondary); }
+
+.upload-zone {
+  margin:18px 20px 0; padding:0;
+  border-radius:20px; overflow:hidden;
+  position:relative; height:320px;
+  background:var(--bg-secondary);
+  border:2px dashed rgba(200,164,78,0.2);
+  cursor:pointer; transition:all 0.4s ease;
+}
+.upload-zone:hover { border-color:rgba(200,164,78,0.4); }
+.upload-zone.has-photo { border:none; }
+
+.upload-placeholder {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:12px;
+  transition:all 0.4s ease;
+}
+.upload-zone.has-photo .upload-placeholder { opacity:0; pointer-events:none; }
+
+.face-outline {
+  width:120px; height:160px; border-radius:50%;
+  border:2px solid rgba(200,164,78,0.3);
+  position:relative;
+  animation:pulse-outline 2.5s ease-in-out infinite;
+}
+@keyframes pulse-outline {
+  0%,100% { box-shadow:0 0 0 0 rgba(200,164,78,0.1); }
+  50% { box-shadow:0 0 0 20px rgba(200,164,78,0); }
+}
+.face-outline::before {
+  content:''; position:absolute;
+  top:10%; left:10%; right:10%; bottom:10%;
+  border:1px dashed rgba(200,164,78,0.15);
+  border-radius:50%;
+}
+.upload-placeholder .up-text { font-size:14px; font-weight:500; color:var(--text-secondary); }
+.upload-placeholder .up-sub { font-size:11px; color:var(--text-tertiary); }
+
+.upload-photo {
+  position:absolute; inset:0;
+  opacity:0; transition:all 0.6s ease;
+}
+.upload-zone.has-photo .upload-photo { opacity:1; }
+.upload-photo img { width:100%; height:100%; object-fit:cover; }
+
+/* Try-on Result Overlay */
+.tryon-result {
+  position:absolute; inset:0;
+  opacity:0; transition:all 0.5s ease;
+  pointer-events:none;
+}
+.tryon-result.visible { opacity:1; pointer-events:auto; }
+.tryon-result .result-split {
+  width:100%; height:100%; position:relative; overflow:hidden;
+}
+.result-before, .result-after {
+  position:absolute; top:0; bottom:0;
+  overflow:hidden;
+}
+.result-before { left:0; width:50%; border-right:2px solid var(--gold); }
+.result-after { right:0; width:50%; }
+.result-before img, .result-after img {
+  width:320px; height:320px; object-fit:cover;
+  position:absolute; top:0;
+}
+.result-before img { left:0; }
+.result-after img { right:0; }
+.result-label {
+  position:absolute; bottom:12px;
+  padding:4px 10px; border-radius:6px;
+  background:rgba(0,0,0,0.7); backdrop-filter:blur(4px);
+  font-size:10px; font-weight:600; letter-spacing:0.5px;
+  text-transform:uppercase;
+}
+.result-before .result-label { left:10px; }
+.result-after .result-label { right:10px; color:var(--gold); }
+.slider-handle {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:32px; height:32px; border-radius:50%;
+  background:var(--gold); border:3px solid #fff;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 12px rgba(0,0,0,0.4);
+  z-index:2;
+}
+.slider-handle svg { width:14px; height:14px; }
+
+/* Try-on action bar */
+.tryon-actions {
+  display:flex; gap:10px; padding:14px 20px 0;
+  justify-content:center;
+}
+.tryon-act-btn {
+  display:flex; align-items:center; gap:6px;
+  padding:10px 16px; border-radius:10px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  color:var(--text-secondary); font-size:12px; font-weight:500;
+  cursor:pointer; transition:all 0.25s ease;
+}
+.tryon-act-btn:hover { background:var(--bg-glass-strong); color:var(--text-primary); }
+.tryon-act-btn svg { width:16px; height:16px; }
+
+/* Color Palette */
+.color-palette {
+  display:flex; gap:10px; padding:14px 20px 0;
+  justify-content:center; align-items:center;
+}
+.color-palette .cp-label { font-size:11px; color:var(--text-tertiary); margin-right:4px; }
+.color-dot {
+  width:26px; height:26px; border-radius:50%;
+  cursor:pointer; transition:all 0.2s ease;
+  border:2px solid transparent;
+}
+.color-dot:hover, .color-dot.active { border-color:var(--gold); transform:scale(1.15); }
+
+/* Category Pills */
+.cat-scroll {
+  display:flex; gap:8px; padding:16px 20px 0;
+  overflow-x:auto; scrollbar-width:none;
+}
+.cat-scroll::-webkit-scrollbar { display:none; }
+
+/* Hairstyle Grid */
+.style-grid {
+  display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;
+  padding:14px 20px 0;
+}
+.style-item {
+  border-radius:12px; overflow:hidden;
+  position:relative; cursor:pointer;
+  transition:all 0.3s ease;
+  aspect-ratio:3/4;
+}
+.style-item:hover { transform:scale(1.03); }
+.style-item.selected { outline:2px solid var(--gold); outline-offset:2px; }
+.style-item img { width:100%; height:100%; object-fit:cover; }
+.style-item .si-name {
+  position:absolute; bottom:0; left:0; right:0;
+  padding:20px 8px 8px;
+  background:linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  font-size:10px; font-weight:600;
+}
+.style-item .si-price {
+  position:absolute; top:6px; right:6px;
+  padding:3px 7px; border-radius:5px;
+  background:rgba(0,0,0,0.6); backdrop-filter:blur(4px);
+  font-size:9px; color:var(--gold); font-weight:600;
+}
+
+/* ===================== BOOKING SCREEN ===================== */
+.book-header {
+  padding:10px 20px 0;
+}
+.book-header h1 {
+  font-family:var(--font-display); font-size:24px; font-weight:600;
+  margin-bottom:4px;
+}
+.book-header p { font-size:12px; color:var(--text-secondary); }
+
+/* Booking Steps */
+.book-progress {
+  display:flex; align-items:center; gap:0;
+  padding:18px 20px 0;
+}
+.bp-step {
+  display:flex; align-items:center; gap:6px;
+  cursor:pointer;
+}
+.bp-num {
+  width:28px; height:28px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:600;
+  background:var(--bg-glass); border:1px solid var(--border);
+  color:var(--text-tertiary);
+  transition:all 0.3s ease;
+}
+.bp-step.active .bp-num {
+  background:var(--gold); border-color:var(--gold); color:#0a0a0a;
+}
+.bp-step.done .bp-num {
+  background:rgba(78,203,141,0.15); border-color:rgba(78,203,141,0.3); color:var(--accent-green);
+}
+.bp-label { font-size:11px; color:var(--text-tertiary); font-weight:500; }
+.bp-step.active .bp-label { color:var(--text-primary); }
+.bp-step.done .bp-label { color:var(--accent-green); }
+.bp-line {
+  flex:1; height:1px; margin:0 8px;
+  background:var(--border);
+}
+.bp-line.done { background:rgba(78,203,141,0.3); }
+
+/* Service Selection */
+.service-list {
+  padding:18px 20px 0;
+  display:flex; flex-direction:column; gap:10px;
+}
+.service-card {
+  display:flex; align-items:center; gap:14px;
+  padding:14px 16px; border-radius:14px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  cursor:pointer; transition:all 0.3s ease;
+}
+.service-card:hover { border-color:rgba(200,164,78,0.2); }
+.service-card.selected { border-color:rgba(200,164,78,0.4); background:var(--gold-dim); }
+.service-icon {
+  width:44px; height:44px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px;
+  background:var(--bg-glass);
+}
+.service-card.selected .service-icon { background:rgba(200,164,78,0.15); }
+.service-info { flex:1; }
+.service-info h4 { font-size:14px; font-weight:600; margin-bottom:2px; }
+.service-info p { font-size:11px; color:var(--text-secondary); }
+.service-price { font-size:14px; font-weight:600; color:var(--gold); }
+
+/* Stylist Selection */
+.stylist-scroll {
+  display:flex; gap:14px; padding:18px 20px 0;
+  overflow-x:auto; scrollbar-width:none;
+}
+.stylist-scroll::-webkit-scrollbar { display:none; }
+.stylist-card {
+  flex-shrink:0; width:110px; text-align:center;
+  cursor:pointer; transition:all 0.3s ease;
+}
+.stylist-card:hover { transform:translateY(-3px); }
+.stylist-card.selected .stylist-avatar { outline:2px solid var(--gold); outline-offset:3px; }
+.stylist-avatar {
+  width:80px; height:80px; border-radius:50%;
+  overflow:hidden; margin:0 auto 10px;
+}
+.stylist-avatar img { width:100%; height:100%; object-fit:cover; }
+.stylist-card h4 { font-size:13px; font-weight:600; margin-bottom:2px; }
+.stylist-card .stars { font-size:10px; color:var(--gold); margin-bottom:2px; }
+.stylist-card p { font-size:10px; color:var(--text-secondary); }
+
+/* Date/Time Picker */
+.date-section { padding:18px 20px 0; }
+.date-section h3 { font-size:14px; font-weight:600; margin-bottom:12px; }
+.date-row {
+  display:flex; gap:8px; margin-bottom:16px;
+  overflow-x:auto; scrollbar-width:none;
+}
+.date-row::-webkit-scrollbar { display:none; }
+.date-chip {
+  flex-shrink:0; padding:10px 14px; border-radius:12px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  text-align:center; cursor:pointer;
+  transition:all 0.25s ease; min-width:58px;
+}
+.date-chip:hover { border-color:rgba(200,164,78,0.2); }
+.date-chip.selected { background:var(--gold-dim); border-color:rgba(200,164,78,0.4); }
+.date-chip .dc-day { font-size:10px; color:var(--text-secondary); margin-bottom:2px; }
+.date-chip .dc-num { font-size:16px; font-weight:700; }
+.date-chip.selected .dc-day { color:var(--gold); }
+.date-chip.selected .dc-num { color:var(--gold); }
+
+.time-grid {
+  display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;
+}
+.time-slot {
+  padding:10px; border-radius:10px; text-align:center;
+  background:var(--bg-glass); border:1px solid var(--border);
+  font-size:13px; font-weight:500; cursor:pointer;
+  transition:all 0.25s ease;
+}
+.time-slot:hover { border-color:rgba(200,164,78,0.2); }
+.time-slot.selected { background:var(--gold-dim); border-color:rgba(200,164,78,0.4); color:var(--gold); }
+.time-slot.unavailable { opacity:0.3; pointer-events:none; text-decoration:line-through; }
+
+/* Booking CTA */
+.book-cta {
+  padding:20px 20px 0;
+  text-align:center;
+}
+.book-cta .gold-btn { width:100%; }
+
+/* Confirmation */
+.confirm-card {
+  margin:20px; padding:24px; border-radius:20px;
+  background:var(--bg-glass); border:1px solid var(--border);
+  text-align:center;
+}
+.confirm-check {
+  width:60px; height:60px; border-radius:50%;
+  background:linear-gradient(135deg, rgba(78,203,141,0.2), rgba(78,203,141,0.05));
+  display:flex; align-items:center; justify-content:center;
+  margin:0 auto 16px;
+}
+.confirm-check svg { width:28px; height:28px; }
+.confirm-card h2 { font-family:var(--font-display); font-size:22px; margin-bottom:6px; }
+.confirm-card p { font-size:13px; color:var(--text-secondary); margin-bottom:16px; line-height:1.5; }
+.confirm-details {
+  text-align:left; padding:14px; border-radius:12px;
+  background:rgba(255,255,255,0.03); margin-bottom:16px;
+}
+.confirm-row {
+  display:flex; justify-content:space-between;
+  padding:8px 0; border-bottom:1px solid var(--border);
+  font-size:13px;
+}
+.confirm-row:last-child { border:none; }
+.confirm-row .cr-label { color:var(--text-secondary); }
+.confirm-row .cr-value { font-weight:600; }
+
+/* ===================== LOYALTY SCREEN ===================== */
+.loyalty-header {
+  padding:10px 20px 16px;
+  text-align:center;
+  background:linear-gradient(to bottom, rgba(200,164,78,0.06), transparent);
+}
+.loyalty-header h1 {
+  font-family:var(--font-display); font-size:24px; font-weight:600;
+}
+
+.tier-card {
+  margin:0 20px; padding:24px; border-radius:20px;
+  background:linear-gradient(135deg, rgba(200,164,78,0.1), rgba(200,164,78,0.02));
+  border:1px solid rgba(200,164,78,0.15);
+  position:relative; overflow:hidden;
+}
+.tier-card::before {
+  content:''; position:absolute; top:-40px; right:-40px;
+  width:120px; height:120px; border-radius:50%;
+  background:radial-gradient(circle, rgba(200,164,78,0.15), transparent);
+}
+.tier-badge {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 14px; border-radius:8px;
+  background:rgba(200,164,78,0.15);
+  font-size:12px; font-weight:700; color:var(--gold);
+  letter-spacing:0.5px; margin-bottom:14px;
+}
+.tier-points {
+  font-size:38px; font-weight:700; letter-spacing:-1px;
+  margin-bottom:2px;
+}
+.tier-points span { font-size:14px; font-weight:400; color:var(--text-secondary); margin-left:4px; }
+.tier-next { font-size:12px; color:var(--text-secondary); margin-bottom:14px; }
+.tier-next strong { color:var(--gold); }
+.tier-progress {
+  height:6px; border-radius:3px;
+  background:rgba(255,255,255,0.06);
+  overflow:hidden;
+}
+.tier-progress-fill {
+  height:100%; border-radius:3px;
+  background:linear-gradient(90deg, var(--gold), var(--gold-light));
+  transition:width 1s ease;
+}
+
+/* Punch Card */
+.punch-card {
+  margin:18px 20px 0; padding:18px;
+  border-radius:var(--radius);
+  background:var(--bg-glass); border:1px solid var(--border);
+}
+.punch-card h3 { font-size:14px; font-weight:600; margin-bottom:4px; }
+.punch-card .pc-sub { font-size:11px; color:var(--text-secondary); margin-bottom:14px; }
+.punch-dots {
+  display:flex; gap:8px; justify-content:center; flex-wrap:wrap;
+}
+.punch-dot {
+  width:40px; height:40px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--bg-glass); border:1px solid var(--border);
+  font-size:14px; transition:all 0.3s ease;
+}
+.punch-dot.stamped {
+  background:var(--gold-dim); border-color:rgba(200,164,78,0.3);
+}
+.punch-dot.reward {
+  background:linear-gradient(135deg, rgba(200,164,78,0.2), rgba(200,164,78,0.05));
+  border-color:rgba(200,164,78,0.3); color:var(--gold);
+  font-size:11px; font-weight:700;
+}
+
+/* Referral */
+.referral-card {
+  margin:18px 20px 0; padding:18px;
+  border-radius:var(--radius);
+  background:var(--bg-glass); border:1px solid var(--border);
+}
+.referral-card h3 { font-size:14px; font-weight:600; margin-bottom:4px; }
+.referral-card p { font-size:11px; color:var(--text-secondary); margin-bottom:12px; }
+.referral-code {
+  display:flex; align-items:center; gap:10px;
+}
+.referral-code .code {
+  flex:1; padding:10px 14px; border-radius:10px;
+  background:rgba(255,255,255,0.03);
+  font-family:var(--font-mono); font-size:15px; font-weight:500;
+  letter-spacing:2px; color:var(--gold);
+}
+.referral-code .copy-btn {
+  padding:10px 16px; border-radius:10px;
+  background:var(--gold-dim); border:1px solid rgba(200,164,78,0.3);
+  color:var(--gold); font-size:12px; font-weight:600;
+  cursor:pointer; transition:all 0.25s ease;
+}
+
+/* Activity */
+.activity-list { padding:0 20px; }
+.activity-item {
+  display:flex; align-items:center; gap:12px;
+  padding:12px 0; border-bottom:1px solid var(--border);
+}
+.activity-item:last-child { border:none; }
+.act-icon {
+  width:36px; height:36px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px;
+}
+.act-icon.earn { background:rgba(78,203,141,0.1); }
+.act-icon.redeem { background:rgba(224,85,85,0.1); }
+.act-info { flex:1; }
+.act-info h4 { font-size:13px; font-weight:500; }
+.act-info p { font-size:11px; color:var(--text-secondary); }
+.act-pts { font-size:14px; font-weight:600; }
+.act-pts.positive { color:var(--accent-green); }
+.act-pts.negative { color:var(--accent-red); }
+
+/* ===================== PROFILE SCREEN ===================== */
+.profile-header {
+  padding:10px 20px 0; text-align:center;
+}
+.profile-avatar {
+  width:80px; height:80px; border-radius:50%;
+  overflow:hidden; margin:0 auto 12px;
+  border:2px solid rgba(200,164,78,0.3);
+}
+.profile-avatar img { width:100%; height:100%; object-fit:cover; }
+.profile-header h2 { font-size:20px; font-weight:600; margin-bottom:2px; }
+.profile-header p { font-size:12px; color:var(--text-secondary); margin-bottom:4px; }
+.profile-header .member-since { font-size:11px; color:var(--text-tertiary); }
+
+.profile-stats {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
+  padding:18px 20px 0;
+}
+.profile-stat {
+  text-align:center; padding:14px 8px;
+  border-radius:14px; background:var(--bg-glass);
+  border:1px solid var(--border);
+}
+.profile-stat .ps-val { font-size:20px; font-weight:700; margin-bottom:2px; }
+.profile-stat .ps-label { font-size:10px; color:var(--text-secondary); }
+
+.profile-menu { padding:18px 20px 0; }
+.pm-item {
+  display:flex; align-items:center; gap:14px;
+  padding:14px 0; border-bottom:1px solid var(--border);
+  cursor:pointer; transition:all 0.2s ease;
+}
+.pm-item:hover { padding-left:4px; }
+.pm-item:last-child { border:none; }
+.pm-icon {
+  width:38px; height:38px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--bg-glass); font-size:16px;
+}
+.pm-item .pm-text { flex:1; }
+.pm-item h4 { font-size:14px; font-weight:500; }
+.pm-item p { font-size:11px; color:var(--text-secondary); }
+.pm-arrow { color:var(--text-tertiary); font-size:14px; }
+
+/* Wishlist Grid */
+.wishlist-grid {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+  padding:14px 20px 0;
+}
+.wishlist-item {
+  aspect-ratio:3/4; border-radius:10px; overflow:hidden;
+  position:relative; cursor:pointer;
+}
+.wishlist-item img { width:100%; height:100%; object-fit:cover; }
+.wishlist-heart {
+  position:absolute; top:6px; right:6px;
+  width:24px; height:24px; border-radius:50%;
+  background:rgba(224,85,85,0.8);
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px;
+}
+
+/* ===================== ANIMATIONS ===================== */
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(16px); }
+  to { opacity:1; transform:translateY(0); }
+}
+.animate-in { animation:fadeUp 0.5s ease forwards; }
+.delay-1 { animation-delay:0.08s; opacity:0; }
+.delay-2 { animation-delay:0.16s; opacity:0; }
+.delay-3 { animation-delay:0.24s; opacity:0; }
+.delay-4 { animation-delay:0.32s; opacity:0; }
+.delay-5 { animation-delay:0.4s; opacity:0; }
+
+@keyframes shimmer {
+  0% { background-position:-200% 0; }
+  100% { background-position:200% 0; }
+}
+.shimmer {
+  background:linear-gradient(90deg, transparent 25%, rgba(200,164,78,0.08) 50%, transparent 75%);
+  background-size:200% 100%;
+  animation:shimmer 3s ease infinite;
+}
+
+/* Floating particles */
+.particle {
+  position:absolute; border-radius:50%;
+  background:rgba(200,164,78,0.1);
+  pointer-events:none;
+}
+
+/* Toast */
+.toast {
+  position:absolute; top:70px; left:20px; right:20px;
+  padding:14px 18px; border-radius:14px;
+  background:rgba(78,203,141,0.15); border:1px solid rgba(78,203,141,0.3);
+  color:var(--accent-green);
+  font-size:13px; font-weight:500;
+  display:flex; align-items:center; gap:10px;
+  z-index:200;
+  transform:translateY(-20px); opacity:0;
+  transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+.toast.show { transform:translateY(0); opacity:1; }
+.toast svg { width:18px; height:18px; flex-shrink:0; }
+
+/* Book step panels */
+.book-step { display:none; }
+.book-step.active { display:block; }
+</style>
+</head>
+<body>
+
+<div class="phone-frame" id="app">
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span class="time">9:41</span>
+    <div class="status-icons">
+      <svg viewBox="0 0 18 18"><path d="M1 13h2v4H1zM5 9h2v8H5zM9 5h2v12H9zM13 1h2v16h-2z" fill="currentColor" stroke="none"/></svg>
+      <svg viewBox="0 0 18 18"><path d="M9 3C5.7 3 2.7 4.3 1 6.5L9 16l8-9.5C15.3 4.3 12.3 3 9 3z" fill="currentColor" stroke="none"/></svg>
+      <svg viewBox="0 0 24 14"><rect x="1" y="1" width="20" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="22" y="4" width="2" height="6" rx="1" fill="currentColor"/><rect x="3" y="3" width="12" height="8" rx="1" fill="#4ecb8d"/></svg>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+    <span id="toastMsg">Style saved to wishlist!</span>
+  </div>
+
+  <!-- Screen Container -->
+  <div class="screen-container">
+
+    <!-- ============ HOME SCREEN ============ -->
+    <div class="screen active" id="screen-home">
+      <div class="home-header animate-in">
+        <div class="home-logo">fit.</div>
+        <div class="home-header-actions">
+          <div class="lang-toggle" onclick="toggleLang()">EN / FR</div>
+          <div class="notif-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></svg>
+            <div class="notif-dot"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="home-greeting animate-in delay-1">
+        Good morning, <strong>Amara</strong> ✨
+      </div>
+
+      <div class="hero-card animate-in delay-2" onclick="switchTab(1)">
+        <img src="https://images.unsplash.com/photo-1560066984-138dadb4c035?w=600&fit=crop" alt="Salon">
+        <div class="hero-overlay">
+          <div class="hero-tag">AI-Powered</div>
+          <h2>Try a New Look Today</h2>
+          <p>Preview hairstyles on your photo instantly</p>
+        </div>
+      </div>
+
+      <div class="quick-actions animate-in delay-3">
+        <div class="quick-action" onclick="switchTab(1)">
+          <div class="qa-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M12 2a5 5 0 015 5c0 2-1 3.5-2.5 5S12 15 12 17c0-2-1.5-3.5-2.5-5S7 9 7 7a5 5 0 015-5z"/><path d="M12 17v5M8 22h8"/></svg>
+          </div>
+          <span class="qa-arrow">→</span>
+          <h3>AI Try-On</h3>
+          <p>Preview styles on your photo</p>
+        </div>
+        <div class="quick-action" onclick="switchTab(2)">
+          <div class="qa-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <span class="qa-arrow">→</span>
+          <h3>Book Now</h3>
+          <p>Reserve your next appointment</p>
+        </div>
+      </div>
+
+      <div class="points-banner animate-in delay-4" onclick="switchTab(3)">
+        <div class="points-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <div class="points-info">
+          <div class="pts-label">Your Loyalty Points</div>
+          <div class="pts-value">1,280 <span>Silver Member</span></div>
+        </div>
+        <div class="pts-tier">SILVER</div>
+      </div>
+
+      <div style="margin-top:22px;">
+        <div class="section-header">
+          <span class="section-title">Trending Now</span>
+          <span class="section-link" onclick="switchTab(1)">See All</span>
+        </div>
+        <div class="trending-scroll animate-in delay-5">
+          <div class="trending-card" onclick="switchTab(1)">
+            <div class="trending-img">
+              <img src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=300&fit=crop" alt="Braids">
+              <div class="trending-badge">🔥 Hot</div>
+            </div>
+            <h4>Box Braids</h4>
+            <p>From 8,000 FCFA</p>
+          </div>
+          <div class="trending-card" onclick="switchTab(1)">
+            <div class="trending-img">
+              <img src="https://images.unsplash.com/photo-1605980776566-0486c3ac7617?w=300&fit=crop" alt="Afro">
+            </div>
+            <h4>Natural Afro</h4>
+            <p>From 5,000 FCFA</p>
+          </div>
+          <div class="trending-card" onclick="switchTab(1)">
+            <div class="trending-img">
+              <img src="https://images.unsplash.com/photo-1634449571010-02389ed0f9b0?w=300&fit=crop" alt="Fade">
+              <div class="trending-badge">New</div>
+            </div>
+            <h4>Skin Fade</h4>
+            <p>From 3,000 FCFA</p>
+          </div>
+          <div class="trending-card" onclick="switchTab(1)">
+            <div class="trending-img">
+              <img src="https://images.unsplash.com/photo-1595959183082-7b570b7e1e6b?w=300&fit=crop" alt="Locs">
+            </div>
+            <h4>Faux Locs</h4>
+            <p>From 12,000 FCFA</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:22px;">
+        <div class="section-header">
+          <span class="section-title">Upcoming</span>
+        </div>
+        <div style="padding:0 20px;">
+          <div class="glass-card" style="padding:16px; display:flex; align-items:center; gap:14px;">
+            <div style="width:44px;height:44px;border-radius:12px;background:rgba(91,140,240,0.1);display:flex;align-items:center;justify-content:center;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:600;">Hair Treatment</div>
+              <div style="font-size:11px;color:var(--text-secondary);">Wed, Mar 12 · 10:00 AM</div>
+            </div>
+            <div style="padding:6px 12px;border-radius:8px;background:rgba(91,140,240,0.1);color:var(--accent-blue);font-size:11px;font-weight:600;">In 2 days</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TRY-ON SCREEN ============ -->
+    <div class="screen" id="screen-tryon">
+      <div class="tryon-header animate-in">
+        <h1>AI Try-On</h1>
+        <p>See yourself in a new style instantly</p>
+      </div>
+
+      <div class="upload-zone" id="uploadZone" onclick="simulateUpload()">
+        <div class="upload-placeholder">
+          <div class="face-outline"></div>
+          <div class="up-text">Tap to upload your photo</div>
+          <div class="up-sub">or take one with camera</div>
+        </div>
+        <div class="upload-photo">
+          <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=500&fit=crop" alt="Your photo" id="userPhoto">
+        </div>
+        <div class="tryon-result" id="tryonResult">
+          <div class="result-split">
+            <div class="result-before">
+              <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=500&fit=crop" alt="Before">
+              <span class="result-label">Before</span>
+            </div>
+            <div class="result-after">
+              <img id="resultAfterImg" src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&fit=crop" alt="After">
+              <span class="result-label">After</span>
+            </div>
+            <div class="slider-handle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="2.5"><path d="M18 8l4 4-4 4M6 8l-4 4 4 4"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tryon-actions" id="tryonActions" style="display:none;">
+        <div class="tryon-act-btn" onclick="showToast('Style saved to wishlist!')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+          Save
+        </div>
+        <div class="tryon-act-btn" onclick="showToast('Share link copied!')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+          Share
+        </div>
+        <div class="tryon-act-btn" onclick="resetTryon()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
+          Reset
+        </div>
+      </div>
+
+      <div class="color-palette" id="colorPalette" style="display:none;">
+        <span class="cp-label">Color:</span>
+        <div class="color-dot active" style="background:#1a1a1a;" onclick="selectColor(this)"></div>
+        <div class="color-dot" style="background:#3d2314;" onclick="selectColor(this)"></div>
+        <div class="color-dot" style="background:#8B4513;" onclick="selectColor(this)"></div>
+        <div class="color-dot" style="background:#DAA520;" onclick="selectColor(this)"></div>
+        <div class="color-dot" style="background:#C41E3A;" onclick="selectColor(this)"></div>
+        <div class="color-dot" style="background:#2E2E5E;" onclick="selectColor(this)"></div>
+        <div class="color-dot" style="background:#E8D5B7;" onclick="selectColor(this)"></div>
+      </div>
+
+      <div class="cat-scroll">
+        <div class="pill active" onclick="filterCat(this,'all')">All Styles</div>
+        <div class="pill" onclick="filterCat(this,'braids')">Braids</div>
+        <div class="pill" onclick="filterCat(this,'afro')">Afro</div>
+        <div class="pill" onclick="filterCat(this,'short')">Short Hair</div>
+        <div class="pill" onclick="filterCat(this,'locs')">Locs</div>
+        <div class="pill" onclick="filterCat(this,'fades')">Fades</div>
+        <div class="pill" onclick="filterCat(this,'curls')">Curls</div>
+      </div>
+
+      <div class="style-grid" id="styleGrid">
+        <div class="style-item" data-cat="braids" onclick="selectStyle(this, 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&fit=crop')">
+          <img src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=300&fit=crop" alt="Box Braids">
+          <div class="si-name">Box Braids</div>
+          <div class="si-price">8,000</div>
+        </div>
+        <div class="style-item" data-cat="afro" onclick="selectStyle(this, 'https://images.unsplash.com/photo-1605980776566-0486c3ac7617?w=500&fit=crop')">
+          <img src="https://images.unsplash.com/photo-1605980776566-0486c3ac7617?w=300&fit=crop" alt="Natural Afro">
+          <div class="si-name">Natural Afro</div>
+          <div class="si-price">5,000</div>
+        </div>
+        <div class="style-item" data-cat="fades" onclick="selectStyle(this, 'https://images.unsplash.com/photo-1634449571010-02389ed0f9b0?w=500&fit=crop')">
+          <img src="https://images.unsplash.com/photo-1634449571010-02389ed0f9b0?w=300&fit=crop" alt="Skin Fade">
+          <div class="si-name">Skin Fade</div>
+          <div class="si-price">3,000</div>
+        </div>
+        <div class="style-item" data-cat="locs" onclick="selectStyle(this, 'https://images.unsplash.com/photo-1595959183082-7b570b7e1e6b?w=500&fit=crop')">
+          <img src="https://images.unsplash.com/photo-1595959183082-7b570b7e1e6b?w=300&fit=crop" alt="Faux Locs">
+          <div class="si-name">Faux Locs</div>
+          <div class="si-price">12,000</div>
+        </div>
+        <div class="style-item" data-cat="curls" onclick="selectStyle(this, 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=500&fit=crop')">
+          <img src="https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=300&fit=crop" alt="Defined Curls">
+          <div class="si-name">Defined Curls</div>
+          <div class="si-price">6,000</div>
+        </div>
+        <div class="style-item" data-cat="braids" onclick="selectStyle(this, 'https://images.unsplash.com/photo-1589156280159-27698a70f29e?w=500&fit=crop')">
+          <img src="https://images.unsplash.com/photo-1589156280159-27698a70f29e?w=300&fit=crop" alt="Cornrows">
+          <div class="si-name">Cornrows</div>
+          <div class="si-price">5,500</div>
+        </div>
+        <div class="style-item" data-cat="short" onclick="selectStyle(this, 'https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=500&fit=crop')">
+          <img src="https://images.unsplash.com/photo-1622286342621-4bd786c2447c?w=300&fit=crop" alt="Pixie Cut">
+          <div class="si-name">Pixie Cut</div>
+          <div class="si-price">4,000</div>
+        </div>
+        <div class="style-item" data-cat="fades" onclick="selectStyle(this, 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=500&fit=crop')">
+          <img src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=300&fit=crop" alt="Taper Fade">
+          <div class="si-name">Taper Fade</div>
+          <div class="si-price">3,500</div>
+        </div>
+        <div class="style-item" data-cat="curls" onclick="selectStyle(this, 'https://images.unsplash.com/photo-1542596768-5d1d21f1cf98?w=500&fit=crop')">
+          <img src="https://images.unsplash.com/photo-1542596768-5d1d21f1cf98?w=300&fit=crop" alt="Twist Out">
+          <div class="si-name">Twist Out</div>
+          <div class="si-price">7,000</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ BOOKING SCREEN ============ -->
+    <div class="screen" id="screen-book">
+      <div class="book-header animate-in">
+        <h1>Book Appointment</h1>
+        <p>Reserve your next salon visit</p>
+      </div>
+
+      <div class="book-progress animate-in delay-1">
+        <div class="bp-step active" id="bpStep1"><div class="bp-num">1</div><span class="bp-label">Service</span></div>
+        <div class="bp-line" id="bpLine1"></div>
+        <div class="bp-step" id="bpStep2"><div class="bp-num">2</div><span class="bp-label">Stylist</span></div>
+        <div class="bp-line" id="bpLine2"></div>
+        <div class="bp-step" id="bpStep3"><div class="bp-num">3</div><span class="bp-label">Time</span></div>
+        <div class="bp-line" id="bpLine3"></div>
+        <div class="bp-step" id="bpStep4"><div class="bp-num">4</div><span class="bp-label">Confirm</span></div>
+      </div>
+
+      <!-- Step 1: Service -->
+      <div class="book-step active" id="bookStep1">
+        <div class="section-header" style="margin-top:20px;">
+          <span class="section-title">Select Service</span>
+        </div>
+        <div class="service-list">
+          <div class="service-card" onclick="selectService(this, 'Haircut & Styling', '5,000 FCFA')">
+            <div class="service-icon">✂️</div>
+            <div class="service-info">
+              <h4>Haircut & Styling</h4>
+              <p>45 min · Cut, wash & style</p>
+            </div>
+            <div class="service-price">5,000</div>
+          </div>
+          <div class="service-card" onclick="selectService(this, 'Braiding', '8,000 FCFA')">
+            <div class="service-icon">🎀</div>
+            <div class="service-info">
+              <h4>Braiding</h4>
+              <p>2-4 hrs · Box braids, cornrows, twists</p>
+            </div>
+            <div class="service-price">8,000+</div>
+          </div>
+          <div class="service-card" onclick="selectService(this, 'Hair Treatment', '6,000 FCFA')">
+            <div class="service-icon">💆</div>
+            <div class="service-info">
+              <h4>Hair Treatment</h4>
+              <p>1 hr · Deep conditioning & repair</p>
+            </div>
+            <div class="service-price">6,000</div>
+          </div>
+          <div class="service-card" onclick="selectService(this, 'Coloring', '10,000 FCFA')">
+            <div class="service-icon">🎨</div>
+            <div class="service-info">
+              <h4>Coloring</h4>
+              <p>1.5 hrs · Full or partial color</p>
+            </div>
+            <div class="service-price">10,000+</div>
+          </div>
+          <div class="service-card" onclick="selectService(this, 'Fade & Lineup', '3,000 FCFA')">
+            <div class="service-icon">💈</div>
+            <div class="service-info">
+              <h4>Fade & Lineup</h4>
+              <p>30 min · Clean fade with edge up</p>
+            </div>
+            <div class="service-price">3,000</div>
+          </div>
+        </div>
+        <div class="book-cta" style="margin-top:16px;">
+          <button class="gold-btn" onclick="nextBookStep(2)" id="serviceNext" style="opacity:0.4;pointer-events:none;">Continue</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Stylist -->
+      <div class="book-step" id="bookStep2">
+        <div class="section-header" style="margin-top:20px;">
+          <span class="section-title">Choose Your Stylist</span>
+        </div>
+        <div class="stylist-scroll">
+          <div class="stylist-card" onclick="selectStylist(this, 'Marie N.')">
+            <div class="stylist-avatar"><img src="https://images.unsplash.com/photo-1594744803329-e58b31de8bf5?w=200&fit=crop" alt="Marie"></div>
+            <h4>Marie N.</h4>
+            <div class="stars">★★★★★</div>
+            <p>Braids Specialist</p>
+          </div>
+          <div class="stylist-card" onclick="selectStylist(this, 'Jean-Paul K.')">
+            <div class="stylist-avatar"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&fit=crop" alt="Jean-Paul"></div>
+            <h4>Jean-Paul K.</h4>
+            <div class="stars">★★★★☆</div>
+            <p>Fades & Cuts</p>
+          </div>
+          <div class="stylist-card" onclick="selectStylist(this, 'Carine T.')">
+            <div class="stylist-avatar"><img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&fit=crop" alt="Carine"></div>
+            <h4>Carine T.</h4>
+            <div class="stars">★★★★★</div>
+            <p>Color Expert</p>
+          </div>
+        </div>
+        <div class="book-cta" style="margin-top:16px;">
+          <button class="gold-btn" onclick="nextBookStep(3)" id="stylistNext" style="opacity:0.4;pointer-events:none;">Continue</button>
+        </div>
+        <div style="text-align:center;margin-top:10px;">
+          <span class="section-link" onclick="nextBookStep(1)" style="cursor:pointer;">← Back to Services</span>
+        </div>
+      </div>
+
+      <!-- Step 3: Date/Time -->
+      <div class="book-step" id="bookStep3">
+        <div class="date-section">
+          <h3>Select Date</h3>
+          <div class="date-row">
+            <div class="date-chip" onclick="selectDate(this, 'Mar 10')"><div class="dc-day">Mon</div><div class="dc-num">10</div></div>
+            <div class="date-chip" onclick="selectDate(this, 'Mar 11')"><div class="dc-day">Tue</div><div class="dc-num">11</div></div>
+            <div class="date-chip selected" onclick="selectDate(this, 'Mar 12')"><div class="dc-day">Wed</div><div class="dc-num">12</div></div>
+            <div class="date-chip" onclick="selectDate(this, 'Mar 13')"><div class="dc-day">Thu</div><div class="dc-num">13</div></div>
+            <div class="date-chip" onclick="selectDate(this, 'Mar 14')"><div class="dc-day">Fri</div><div class="dc-num">14</div></div>
+            <div class="date-chip" onclick="selectDate(this, 'Mar 15')"><div class="dc-day">Sat</div><div class="dc-num">15</div></div>
+          </div>
+          <h3>Available Slots</h3>
+          <div class="time-grid">
+            <div class="time-slot" onclick="selectTime(this,'9:00')">9:00</div>
+            <div class="time-slot" onclick="selectTime(this,'9:30')">9:30</div>
+            <div class="time-slot selected" onclick="selectTime(this,'10:00')">10:00</div>
+            <div class="time-slot" onclick="selectTime(this,'10:30')">10:30</div>
+            <div class="time-slot unavailable">11:00</div>
+            <div class="time-slot" onclick="selectTime(this,'11:30')">11:30</div>
+            <div class="time-slot unavailable">12:00</div>
+            <div class="time-slot" onclick="selectTime(this,'14:00')">14:00</div>
+            <div class="time-slot" onclick="selectTime(this,'14:30')">14:30</div>
+            <div class="time-slot" onclick="selectTime(this,'15:00')">15:00</div>
+            <div class="time-slot" onclick="selectTime(this,'15:30')">15:30</div>
+            <div class="time-slot unavailable">16:00</div>
+          </div>
+        </div>
+        <div class="book-cta" style="margin-top:16px;">
+          <button class="gold-btn" onclick="nextBookStep(4)">Review Booking</button>
+        </div>
+        <div style="text-align:center;margin-top:10px;">
+          <span class="section-link" onclick="nextBookStep(2)" style="cursor:pointer;">← Back to Stylist</span>
+        </div>
+      </div>
+
+      <!-- Step 4: Confirmation -->
+      <div class="book-step" id="bookStep4">
+        <div class="confirm-card" style="margin-top:10px;">
+          <div class="confirm-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+          <h2>Confirm Booking</h2>
+          <p>Review your appointment details</p>
+          <div class="confirm-details">
+            <div class="confirm-row">
+              <span class="cr-label">Service</span>
+              <span class="cr-value" id="confService">Haircut & Styling</span>
+            </div>
+            <div class="confirm-row">
+              <span class="cr-label">Stylist</span>
+              <span class="cr-value" id="confStylist">Marie N.</span>
+            </div>
+            <div class="confirm-row">
+              <span class="cr-label">Date</span>
+              <span class="cr-value" id="confDate">Wed, Mar 12</span>
+            </div>
+            <div class="confirm-row">
+              <span class="cr-label">Time</span>
+              <span class="cr-value" id="confTime">10:00 AM</span>
+            </div>
+            <div class="confirm-row">
+              <span class="cr-label">Price</span>
+              <span class="cr-value" style="color:var(--gold);" id="confPrice">5,000 FCFA</span>
+            </div>
+            <div class="confirm-row">
+              <span class="cr-label">Points Earned</span>
+              <span class="cr-value" style="color:var(--accent-green);">+10 pts</span>
+            </div>
+          </div>
+          <button class="gold-btn" style="width:100%;" onclick="confirmBooking()">Confirm Appointment</button>
+          <div style="margin-top:12px;">
+            <span class="section-link" onclick="nextBookStep(3)" style="cursor:pointer;">← Change time</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ LOYALTY SCREEN ============ -->
+    <div class="screen" id="screen-loyalty">
+      <div class="loyalty-header animate-in">
+        <h1>Loyalty Rewards</h1>
+      </div>
+
+      <div class="tier-card animate-in delay-1">
+        <div class="tier-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          SILVER MEMBER
+        </div>
+        <div class="tier-points">1,280 <span>points</span></div>
+        <div class="tier-next">220 more points to <strong>Gold</strong></div>
+        <div class="tier-progress"><div class="tier-progress-fill" style="width:85%;"></div></div>
+      </div>
+
+      <div class="punch-card animate-in delay-2">
+        <h3>Punch Card</h3>
+        <div class="pc-sub">Every 5th haircut is 50% off!</div>
+        <div class="punch-dots">
+          <div class="punch-dot stamped">✓</div>
+          <div class="punch-dot stamped">✓</div>
+          <div class="punch-dot stamped">✓</div>
+          <div class="punch-dot">4</div>
+          <div class="punch-dot reward">FREE</div>
+        </div>
+      </div>
+
+      <div class="referral-card animate-in delay-3">
+        <h3>Refer a Friend</h3>
+        <p>Earn 100 bonus points per referral!</p>
+        <div class="referral-code">
+          <div class="code">AMARA2026</div>
+          <div class="copy-btn" onclick="showToast('Referral code copied!')">Copy</div>
+        </div>
+      </div>
+
+      <div style="margin-top:22px;">
+        <div class="section-header">
+          <span class="section-title">Recent Activity</span>
+          <span class="section-link">View All</span>
+        </div>
+        <div class="activity-list animate-in delay-4">
+          <div class="activity-item">
+            <div class="act-icon earn">💇</div>
+            <div class="act-info">
+              <h4>Haircut & Styling</h4>
+              <p>Mar 5, 2026</p>
+            </div>
+            <div class="act-pts positive">+10</div>
+          </div>
+          <div class="activity-item">
+            <div class="act-icon earn">👥</div>
+            <div class="act-info">
+              <h4>Referral Bonus</h4>
+              <p>Mar 1, 2026</p>
+            </div>
+            <div class="act-pts positive">+100</div>
+          </div>
+          <div class="activity-item">
+            <div class="act-icon redeem">🎁</div>
+            <div class="act-info">
+              <h4>Redeemed: Free Treatment</h4>
+              <p>Feb 22, 2026</p>
+            </div>
+            <div class="act-pts negative">-200</div>
+          </div>
+          <div class="activity-item">
+            <div class="act-icon earn">📱</div>
+            <div class="act-info">
+              <h4>Social Share Bonus</h4>
+              <p>Feb 18, 2026</p>
+            </div>
+            <div class="act-pts positive">+25</div>
+          </div>
+          <div class="activity-item">
+            <div class="act-icon earn">🎂</div>
+            <div class="act-info">
+              <h4>Birthday Reward</h4>
+              <p>Feb 14, 2026</p>
+            </div>
+            <div class="act-pts positive">+50</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ PROFILE SCREEN ============ -->
+    <div class="screen" id="screen-profile">
+      <div class="profile-header animate-in">
+        <div class="profile-avatar">
+          <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=200&fit=crop" alt="Amara">
+        </div>
+        <h2>Amara Nkembe</h2>
+        <p>amara.nk@email.com</p>
+        <div class="member-since">Member since January 2025</div>
+      </div>
+
+      <div class="profile-stats animate-in delay-1">
+        <div class="profile-stat">
+          <div class="ps-val">23</div>
+          <div class="ps-label">Visits</div>
+        </div>
+        <div class="profile-stat">
+          <div class="ps-val">1,280</div>
+          <div class="ps-label">Points</div>
+        </div>
+        <div class="profile-stat">
+          <div class="ps-val">8</div>
+          <div class="ps-label">Saved</div>
+        </div>
+      </div>
+
+      <div style="margin-top:22px;">
+        <div class="section-header">
+          <span class="section-title">Saved Styles</span>
+          <span class="section-link">View All</span>
+        </div>
+        <div class="wishlist-grid animate-in delay-2">
+          <div class="wishlist-item">
+            <img src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&fit=crop" alt="">
+            <div class="wishlist-heart">♥</div>
+          </div>
+          <div class="wishlist-item">
+            <img src="https://images.unsplash.com/photo-1605980776566-0486c3ac7617?w=200&fit=crop" alt="">
+            <div class="wishlist-heart">♥</div>
+          </div>
+          <div class="wishlist-item">
+            <img src="https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=200&fit=crop" alt="">
+            <div class="wishlist-heart">♥</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="profile-menu animate-in delay-3">
+        <div class="pm-item">
+          <div class="pm-icon">📋</div>
+          <div class="pm-text">
+            <h4>Visit History</h4>
+            <p>View all past appointments</p>
+          </div>
+          <span class="pm-arrow">›</span>
+        </div>
+        <div class="pm-item">
+          <div class="pm-icon">🎨</div>
+          <div class="pm-text">
+            <h4>Style Preferences</h4>
+            <p>Colors, lengths, excluded styles</p>
+          </div>
+          <span class="pm-arrow">›</span>
+        </div>
+        <div class="pm-item">
+          <div class="pm-icon">🔔</div>
+          <div class="pm-text">
+            <h4>Notifications</h4>
+            <p>Push, SMS & email settings</p>
+          </div>
+          <span class="pm-arrow">›</span>
+        </div>
+        <div class="pm-item">
+          <div class="pm-icon">🌍</div>
+          <div class="pm-text">
+            <h4>Language</h4>
+            <p>English / Français</p>
+          </div>
+          <span class="pm-arrow">›</span>
+        </div>
+        <div class="pm-item">
+          <div class="pm-icon">🔒</div>
+          <div class="pm-text">
+            <h4>Privacy & Data</h4>
+            <p>Manage your data & consent</p>
+          </div>
+          <span class="pm-arrow">›</span>
+        </div>
+        <div class="pm-item" style="border:none;">
+          <div class="pm-icon">🚪</div>
+          <div class="pm-text">
+            <h4 style="color:var(--accent-red);">Sign Out</h4>
+            <p>Log out of your account</p>
+          </div>
+          <span class="pm-arrow">›</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Tab Bar -->
+  <div class="tab-bar">
+    <div class="tab-bar-inner">
+      <div class="tab-item active" onclick="switchTab(0)">
+        <div class="tab-dot"></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        <span class="tab-label">Home</span>
+      </div>
+      <div class="tab-item" onclick="switchTab(1)">
+        <div class="tab-dot"></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a5 5 0 015 5c0 2-1 3.5-2.5 5S12 15 12 17c0-2-1.5-3.5-2.5-5S7 9 7 7a5 5 0 015-5z"/>
+          <path d="M12 17v5"/>
+          <path d="M8 22h8"/>
+        </svg>
+        <span class="tab-label">Try-On</span>
+      </div>
+      <div class="tab-item" onclick="switchTab(2)">
+        <div class="tab-dot"></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        <span class="tab-label">Book</span>
+      </div>
+      <div class="tab-item" onclick="switchTab(3)">
+        <div class="tab-dot"></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+        <span class="tab-label">Loyalty</span>
+      </div>
+      <div class="tab-item" onclick="switchTab(4)">
+        <div class="tab-dot"></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span class="tab-label">Profile</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// State
+const screens = ['home','tryon','book','loyalty','profile'];
+let currentTab = 0;
+let photoUploaded = false;
+let selectedServiceName = '';
+let selectedServicePrice = '';
+let selectedStylistName = '';
+let selectedDate = 'Mar 12';
+let selectedTime = '10:00';
+
+// Tab Switching
+function switchTab(idx) {
+  if (idx === currentTab) return;
+  currentTab = idx;
+
+  document.querySelectorAll('.tab-item').forEach((t,i) => {
+    t.classList.toggle('active', i === idx);
+  });
+
+  document.querySelectorAll('.screen').forEach((s,i) => {
+    if (i === idx) {
+      s.classList.add('active');
+      // Re-trigger animations
+      s.querySelectorAll('.animate-in').forEach(el => {
+        el.style.animation = 'none';
+        el.offsetHeight;
+        el.style.animation = '';
+      });
+    } else {
+      s.classList.remove('active');
+    }
+  });
+
+  // Reset booking to step 1 when switching to book tab
+  if (idx === 2) {
+    resetBooking();
+  }
+}
+
+// Toast
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// Language Toggle
+let lang = 'en';
+function toggleLang() {
+  lang = lang === 'en' ? 'fr' : 'en';
+  document.querySelector('.lang-toggle').textContent = lang === 'en' ? 'EN / FR' : 'FR / EN';
+  showToast(lang === 'en' ? 'Language: English' : 'Langue: Français');
+}
+
+// ===== TRY-ON =====
+function simulateUpload() {
+  if (photoUploaded) return;
+  const zone = document.getElementById('uploadZone');
+  zone.classList.add('has-photo');
+  photoUploaded = true;
+
+  document.getElementById('tryonActions').style.display = 'flex';
+  document.getElementById('colorPalette').style.display = 'flex';
+}
+
+function selectStyle(el, imgUrl) {
+  if (!photoUploaded) {
+    simulateUpload();
+    setTimeout(() => selectStyle(el, imgUrl), 600);
+    return;
+  }
+
+  document.querySelectorAll('.style-item').forEach(s => s.classList.remove('selected'));
+  el.classList.add('selected');
+
+  document.getElementById('resultAfterImg').src = imgUrl;
+
+  const result = document.getElementById('tryonResult');
+  result.classList.add('visible');
+
+  document.getElementById('tryonActions').style.display = 'flex';
+  document.getElementById('colorPalette').style.display = 'flex';
+}
+
+function resetTryon() {
+  const zone = document.getElementById('uploadZone');
+  zone.classList.remove('has-photo');
+  photoUploaded = false;
+  document.getElementById('tryonResult').classList.remove('visible');
+  document.getElementById('tryonActions').style.display = 'none';
+  document.getElementById('colorPalette').style.display = 'none';
+  document.querySelectorAll('.style-item').forEach(s => s.classList.remove('selected'));
+}
+
+function selectColor(el) {
+  document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+  el.classList.add('active');
+  showToast('Hair color updated');
+}
+
+function filterCat(el, cat) {
+  document.querySelectorAll('.cat-scroll .pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+
+  document.querySelectorAll('.style-item').forEach(item => {
+    if (cat === 'all' || item.dataset.cat === cat) {
+      item.style.display = '';
+    } else {
+      item.style.display = 'none';
+    }
+  });
+}
+
+// ===== BOOKING =====
+function resetBooking() {
+  for (let i=1; i<=4; i++) {
+    document.getElementById('bookStep'+i).classList.toggle('active', i===1);
+    const step = document.getElementById('bpStep'+i);
+    step.classList.remove('active','done');
+    if (i===1) step.classList.add('active');
+  }
+  document.querySelectorAll('.bp-line').forEach(l => l.classList.remove('done'));
+  document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.stylist-card').forEach(c => c.classList.remove('selected'));
+  const sn = document.getElementById('serviceNext');
+  if(sn) { sn.style.opacity='0.4'; sn.style.pointerEvents='none'; }
+  const stn = document.getElementById('stylistNext');
+  if(stn) { stn.style.opacity='0.4'; stn.style.pointerEvents='none'; }
+}
+
+function selectService(el, name, price) {
+  document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedServiceName = name;
+  selectedServicePrice = price;
+  const btn = document.getElementById('serviceNext');
+  btn.style.opacity = '1';
+  btn.style.pointerEvents = 'auto';
+}
+
+function selectStylist(el, name) {
+  document.querySelectorAll('.stylist-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedStylistName = name;
+  const btn = document.getElementById('stylistNext');
+  btn.style.opacity = '1';
+  btn.style.pointerEvents = 'auto';
+}
+
+function selectDate(el, date) {
+  document.querySelectorAll('.date-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedDate = date;
+}
+
+function selectTime(el, time) {
+  document.querySelectorAll('.time-slot').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedTime = time;
+}
+
+function nextBookStep(step) {
+  for (let i=1; i<=4; i++) {
+    document.getElementById('bookStep'+i).classList.toggle('active', i===step);
+    const s = document.getElementById('bpStep'+i);
+    s.classList.remove('active','done');
+    if (i < step) s.classList.add('done');
+    if (i === step) s.classList.add('active');
+  }
+  for (let i=1; i<=3; i++) {
+    document.getElementById('bpLine'+i).classList.toggle('done', i < step);
+  }
+
+  if (step === 4) {
+    document.getElementById('confService').textContent = selectedServiceName || 'Haircut & Styling';
+    document.getElementById('confStylist').textContent = selectedStylistName || 'Marie N.';
+    document.getElementById('confDate').textContent = selectedDate;
+    document.getElementById('confTime').textContent = selectedTime + ' AM';
+    document.getElementById('confPrice').textContent = selectedServicePrice || '5,000 FCFA';
+  }
+
+  // Scroll to top of book screen
+  document.getElementById('screen-book').scrollTop = 0;
+}
+
+function confirmBooking() {
+  showToast('Appointment confirmed! See you soon.');
+  setTimeout(() => {
+    switchTab(0);
+  }, 1500);
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+  // Subtle ambient animation
+  const frame = document.querySelector('.phone-frame');
+  for (let i = 0; i < 4; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.cssText = `
+      width:${60+Math.random()*80}px; height:${60+Math.random()*80}px;
+      top:${Math.random()*100}%; left:${Math.random()*100}%;
+      opacity:${0.02+Math.random()*0.03};
+      filter:blur(40px);
+    `;
+    frame.insertBefore(p, frame.firstChild);
+  }
+});
+</script>
+</body>
+</html>

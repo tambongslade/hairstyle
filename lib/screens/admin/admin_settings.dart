@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../l10n/app_locale.dart';
 import '../../services/admin_service.dart';
+import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/storage_service.dart';
 import '../login_screen.dart';
+import 'salon_profile_editor.dart';
 import 'style_migration_screen.dart';
 
 class AdminSettings extends StatefulWidget {
@@ -24,6 +26,8 @@ class _AdminSettingsState extends State<AdminSettings> {
   String _salonName = 'Belle Coiffure Douala';
   String _salonAddress = 'Rue de Bonaberi, Douala';
   String _salonPhone = '+237 6XX XXX XXX';
+  String _salonDescription = '';
+  String? _salonLogoUrl;
   String _openingHours = '';
   String _weekendHours = '';
   String _daysOff = '';
@@ -77,8 +81,11 @@ class _AdminSettingsState extends State<AdminSettings> {
       final data = res['data'] as Map<String, dynamic>? ?? res;
       setState(() {
         _salonName = data['name']?.toString() ?? _salonName;
-        _salonAddress = data['address']?.toString() ?? _salonAddress;
+        // Backend canonical field is `location`; accept legacy `address` too.
+        _salonAddress = (data['location'] ?? data['address'])?.toString() ?? _salonAddress;
         _salonPhone = data['phone']?.toString() ?? _salonPhone;
+        _salonDescription = data['description']?.toString() ?? _salonDescription;
+        _salonLogoUrl = data['logoUrl']?.toString();
         _isActive = data['isActive'] ?? data['is_active'] ?? _isActive;
 
         // Business hours
@@ -174,13 +181,22 @@ class _AdminSettingsState extends State<AdminSettings> {
     await _showEditDialog(field, current, (val) async {
       final updateData = <String, dynamic>{};
       if (field == tr('salonName')) updateData['name'] = val;
-      if (field == tr('address')) updateData['address'] = val;
+      if (field == tr('address')) updateData['location'] = val;
       if (field == tr('phone')) updateData['phone'] = val;
       try {
         await AdminService.instance.updateSalon(updateData);
         await _fetchSalon();
       } catch (_) {}
     });
+  }
+
+  Future<void> _openProfileEditor() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const SalonProfileEditor()),
+    );
+    if (changed == true) {
+      await _fetchSalon();
+    }
   }
 
   Future<void> _editBusinessHours(String field, String current) async {
@@ -401,6 +417,9 @@ class _AdminSettingsState extends State<AdminSettings> {
 
   List<_SettingsRow> _buildAccountRows() {
     return [
+      _SettingsRow(Icons.edit_outlined, tr('editSalonProfile'),
+          tr('editSalonProfileSub'),
+          isAction: true, onTap: _openProfileEditor),
       _SettingsRow(Icons.cloud_upload_outlined, tr('syncStyles'), tr('syncStylesSub'),
           isAction: true, onTap: _openStyleMigration),
       _SettingsRow(Icons.storefront, tr('salonName'), _salonName,
@@ -499,59 +518,118 @@ class _AdminSettingsState extends State<AdminSettings> {
         ? _salonName.split(' ').where((w) => w.isNotEmpty).take(2).map((w) => w[0].toUpperCase()).join()
         : 'BC';
     final stylistCount = _stylists.isNotEmpty ? _stylists.length : 3;
+    final fullLogoUrl = ApiClient.getImageUrl(_salonLogoUrl);
 
     return Builder(
       builder: (context) {
-        return Container(
-          margin: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppTheme.getBgSecondary(context),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.getBorder(context)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: AppTheme.getGold(context),
-                  borderRadius: BorderRadius.circular(14),
+        return GestureDetector(
+          onTap: _openProfileEditor,
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppTheme.getBgSecondary(context),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.getBorder(context)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppTheme.getGold(context),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: fullLogoUrl.isNotEmpty
+                      ? Image.network(
+                          fullLogoUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => _logoFallback(initials),
+                          loadingBuilder: (ctx, child, progress) =>
+                              progress == null
+                                  ? child
+                                  : _logoFallback(initials),
+                        )
+                      : _logoFallback(initials),
                 ),
-                child: Center(
-                  child: Text(initials, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _salonName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.getTextPrimary(context)),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(Icons.edit,
+                              size: 14, color: AppTheme.getTextTertiary(context)),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text('$_subscriptionPlan · $stylistCount ${tr('stylist')}s',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.getTextSecondary(context))),
+                      if (_salonDescription.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          _salonDescription,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.getTextTertiary(context),
+                              height: 1.3),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Column(
                   children: [
-                    Text(_salonName, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.getTextPrimary(context))),
-                    const SizedBox(height: 2),
-                    Text('$_subscriptionPlan · $stylistCount ${tr('stylist')}s', style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context))),
+                    Switch(
+                      value: _isActive,
+                      onChanged: _toggleActive,
+                      activeTrackColor: AppTheme.accentGreen,
+                      inactiveThumbColor: AppTheme.getTextTertiary(context),
+                      inactiveTrackColor: AppTheme.getBorder(context),
+                    ),
+                    Text(_isActive ? tr('active') : tr('inactive'),
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: _isActive
+                                ? AppTheme.accentGreen
+                                : AppTheme.accentRed)),
                   ],
                 ),
-              ),
-              Column(
-                children: [
-                  Switch(
-                    value: _isActive,
-                    onChanged: _toggleActive,
-                    activeTrackColor: AppTheme.accentGreen,
-                    inactiveThumbColor: AppTheme.getTextTertiary(context),
-                    inactiveTrackColor: AppTheme.getBorder(context),
-                  ),
-                  Text(_isActive ? tr('active') : tr('inactive'),
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
-                          color: _isActive ? AppTheme.accentGreen : AppTheme.accentRed)),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         );
       }
+    );
+  }
+
+  Widget _logoFallback(String initials) {
+    return Center(
+      child: Text(
+        initials,
+        style: const TextStyle(
+            fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
+      ),
     );
   }
 

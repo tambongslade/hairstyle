@@ -23,6 +23,28 @@ class AdminService {
   Future<Map<String, dynamic>> updateSalon(Map<String, dynamic> data) =>
       _api.put('/admin/salon', body: data);
 
+  /// Update the salon profile including an optional logo image. Sends a
+  /// multipart/form-data PUT when [logo] is provided, falling back to the
+  /// JSON [updateSalon] otherwise.
+  Future<Map<String, dynamic>> updateSalonWithLogo({
+    XFile? logo,
+    required Map<String, String> fields,
+  }) async {
+    if (logo == null) {
+      final body = <String, dynamic>{};
+      fields.forEach((k, v) => body[k] = v);
+      return _api.put('/admin/salon', body: body);
+    }
+    final bytes = await logo.readAsBytes();
+    return _api.uploadMultipartPut(
+      '/admin/salon',
+      bytes: bytes,
+      filename: logo.name,
+      fieldName: 'logo',
+      fields: fields,
+    );
+  }
+
   Future<Map<String, dynamic>> getSubscription() =>
       _api.get('/admin/salon/subscription');
 

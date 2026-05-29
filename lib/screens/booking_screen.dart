@@ -288,6 +288,7 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   Widget build(BuildContext context) {
     if (!_hasSalon) return _buildNoSalonView();
+    if (_isTablet) return _buildTabletLayout();
 
     // Style step — sticky bottom button
     if (_isBooking && _currentStep == 1) {
@@ -331,6 +332,191 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
       ),
     );
+  }
+
+  // ═══════════════════════════════════════
+  //  TABLET — full-screen two-pane layout
+  // ═══════════════════════════════════════
+  Widget _buildTabletLayout() {
+    // Landing (bookings list) — wide, 2-column cards
+    if (!_isBooking) {
+      return RefreshIndicator(
+        onRefresh: _fetchMyBookings,
+        color: AppTheme.getGold(context),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const SizedBox(height: 8), _buildHeader(),
+                _buildBookingsListTablet(),
+                const SizedBox(height: 16), _buildNewBookingButton(),
+                const SizedBox(height: 100),
+              ]),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Booking flow — summary sidebar (left) + active step (right)
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // LEFT — progress + live summary
+        Expanded(
+          flex: 2,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: _buildBookingSidebar(),
+          ),
+        ),
+        const SizedBox(width: 16),
+        // RIGHT — active step
+        Expanded(
+          flex: 3,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const SizedBox(height: 8),
+              if (_currentStep == 0) _buildCategoryStep(),
+              if (_currentStep == 1) ...[
+                _buildStyleStep(),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: GoldButton(text: tr('continueBtn'), expanded: true,
+                      enabled: _selectedStyle != null, onPressed: _nextStep),
+                ),
+                _buildBackButton(),
+              ],
+              if (_currentStep == 2) _buildDateTimeStep(),
+              if (_currentStep == 3) _buildConfirmStep(),
+              const SizedBox(height: 100),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildBookingSidebar() {
+    final steps = [tr('category'), tr('style'), '${tr('date')} & ${tr('time')}', tr('confirmBooking')];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const SizedBox(height: 8),
+      _buildHeader(),
+      const SizedBox(height: 24),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(children: List.generate(steps.length, (i) {
+          final isDone = _currentStep > i;
+          final isActive = _currentStep == i;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(children: [
+              Container(
+                width: 30, height: 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isActive ? AppTheme.getGold(context)
+                      : isDone ? AppTheme.getGoldDim(context) : AppTheme.getBgGlass(context),
+                  border: Border.all(color: isActive || isDone
+                      ? AppTheme.getGold(context).withValues(alpha: 0.5) : AppTheme.getBorder(context)),
+                ),
+                child: Center(child: isDone
+                    ? Icon(Icons.check, size: 16, color: AppTheme.getGold(context))
+                    : Text('${i + 1}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                        color: isActive ? Colors.black : AppTheme.getTextSecondary(context)))),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Text(steps[i], style: TextStyle(fontSize: 14,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  color: isActive ? AppTheme.getTextPrimary(context) : AppTheme.getTextSecondary(context)))),
+            ]),
+          );
+        })),
+      ),
+      const SizedBox(height: 8),
+      _buildSidebarSummary(),
+    ]);
+  }
+
+  Widget _buildSidebarSummary() {
+    final style = _selectedStyle;
+    if (_selectedCategory == null && style == null) return const SizedBox.shrink();
+    final img = style != null ? ApiClient.getImageUrl(style['imageUrl']?.toString() ?? '') : '';
+    final showDateTime = _currentStep >= 2 && _selectedTimeIndex >= 0;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.getBgGlass(context),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.getBorder(context)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(tr('reviewDetails'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+            color: AppTheme.getTextSecondary(context))),
+        const SizedBox(height: 12),
+        if (style != null) ...[
+          Row(children: [
+            Container(
+              width: 48, height: 58, clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.getBorder(context))),
+              child: img.isNotEmpty
+                  ? Image.network(img, fit: BoxFit.cover, errorBuilder: (_, _, _) => _bookingPlaceholder())
+                  : _bookingPlaceholder(),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(style['name']?.toString() ?? '', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                  color: AppTheme.getTextPrimary(context)), maxLines: 2, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
+              Text('${style["price"] ?? "0"} ${tr("fcfa")}', style: TextStyle(fontSize: 12,
+                  fontWeight: FontWeight.w600, color: AppTheme.getGold(context))),
+            ])),
+          ]),
+          const SizedBox(height: 8),
+        ],
+        if (_selectedCategory != null)
+          _ConfirmRow(tr('category'), _categoryLabel(_selectedCategory!), isLast: !showDateTime),
+        if (showDateTime) ...[
+          _ConfirmRow(tr('date'), _fmtDate(_selectedDateStr)),
+          _ConfirmRow(tr('time'), _selectedTimeStr, isLast: true),
+        ],
+      ]),
+    );
+  }
+
+  Widget _buildBookingsListTablet() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          child: Text(tr('yourBookings'), style: AppTheme.displayFont.copyWith(fontSize: 18, color: AppTheme.getTextPrimary(context)))),
+      const SizedBox(height: 12),
+      if (_loadingBookings)
+        Padding(padding: const EdgeInsets.symmetric(vertical: 30),
+            child: Center(child: CircularProgressIndicator(color: AppTheme.getGold(context), strokeWidth: 2)))
+      else if (_myBookings.isEmpty)
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          child: GlassCard(child: Column(children: [
+            Icon(Icons.event_available, size: 40, color: AppTheme.getTextTertiary(context)),
+            const SizedBox(height: 12),
+            Text(tr('noBookingsYet'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.getTextSecondary(context))),
+            const SizedBox(height: 4),
+            Text(tr('noBookingsSub'), style: TextStyle(fontSize: 12, color: AppTheme.getTextTertiary(context)), textAlign: TextAlign.center),
+          ])))
+      else
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: LayoutBuilder(builder: (context, c) {
+            final cardW = (c.maxWidth - 16) / 2;
+            return Wrap(spacing: 16, runSpacing: 0,
+                children: _myBookings.map((b) => SizedBox(width: cardW, child: _buildBookingCard(b, grid: true))).toList());
+          }),
+        ),
+    ]);
   }
 
   // ── No salon ──
@@ -399,7 +585,7 @@ class _BookingScreenState extends State<BookingScreen> {
     ]);
   }
 
-  Widget _buildBookingCard(Map<String, dynamic> booking) {
+  Widget _buildBookingCard(Map<String, dynamic> booking, {bool grid = false}) {
     final id = booking['id']?.toString() ?? '';
     final styleName = booking['style']?['name']?.toString() ?? booking['styleName']?.toString() ?? tr('appointment');
     final styleImg = ApiClient.getImageUrl(booking['style']?['imageUrl']?.toString() ?? '');
@@ -412,7 +598,7 @@ class _BookingScreenState extends State<BookingScreen> {
     final statusColor = _statusColor(status);
 
     return GlassCard(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      margin: grid ? const EdgeInsets.only(bottom: 16) : const EdgeInsets.fromLTRB(20, 0, 20, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

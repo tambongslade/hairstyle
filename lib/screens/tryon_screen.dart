@@ -572,8 +572,12 @@ class _TryOnScreenState extends State<TryOnScreen>
     AppToast.show(context, message: message, type: type, subtitle: subtitle);
   }
 
+  // ───────── RESPONSIVE (tablet) ─────────
+  bool get _isTablet => MediaQuery.of(context).size.width >= 600;
+
   @override
   Widget build(BuildContext context) {
+    if (_isTablet) return _buildTabletLayout();
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Column(
@@ -605,6 +609,67 @@ class _TryOnScreenState extends State<TryOnScreen>
     );
   }
 
+  // Two-pane tablet layout that fills the screen: try-on workspace on the
+  // left, scrollable style browser on the right. Each pane scrolls on its own.
+  Widget _buildTabletLayout() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // LEFT — try-on workspace
+          Expanded(
+            flex: 2,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  _buildHeader(),
+                  const SizedBox(height: 16),
+                  _buildPhotoZone(),
+                  if (_errorMessage != null) _buildError(),
+                  if (_hasPhoto) _buildActionBar(),
+                  if (_hasPhoto && _generatedImage != null)
+                    _buildBookForStyleButton(),
+                  if (_hasPhoto && _generatedImage != null) _buildColorPalette(),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // RIGHT — style browser
+          Expanded(
+            flex: 3,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  _buildGenderTabs(),
+                  const SizedBox(height: 14),
+                  _buildCategoryChips(),
+                  if (_subcategories.isNotEmpty || _loadingSubcategories) ...[
+                    const SizedBox(height: 8),
+                    _buildSubcategoryChips(),
+                  ],
+                  const SizedBox(height: 6),
+                  _buildStyleCount(),
+                  const SizedBox(height: 10),
+                  _buildStyleGrid(),
+                  const SizedBox(height: 100),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ───────── HEADER ─────────
   Widget _buildHeader() {
     return Padding(
@@ -624,14 +689,9 @@ class _TryOnScreenState extends State<TryOnScreen>
 
   // ───────── PHOTO ZONE ─────────
   Widget _buildPhotoZone() {
-    return GestureDetector(
-      onTap: (!_hasPhoto || (!_isGenerating && _generatedImage == null))
-          ? _showImageSourceDialog
-          : null,
-      child: AnimatedContainer(
+    final frame = AnimatedContainer(
         duration: const Duration(milliseconds: 400),
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        height: 340,
+        height: _isTablet ? null : 340,
         decoration: BoxDecoration(
           color: AppTheme.getBgSecondary(context),
           borderRadius: BorderRadius.circular(24),
@@ -661,6 +721,16 @@ class _TryOnScreenState extends State<TryOnScreen>
             if (_generatedImage != null) _buildResultView(),
           ],
         ),
+      );
+    return GestureDetector(
+      onTap: (!_hasPhoto || (!_isGenerating && _generatedImage == null))
+          ? _showImageSourceDialog
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: _isTablet
+            ? AspectRatio(aspectRatio: 3 / 4, child: frame)
+            : frame,
       ),
     );
   }
@@ -1794,12 +1864,19 @@ class _TryOnScreenState extends State<TryOnScreen>
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 14,
-          crossAxisSpacing: 14,
-          childAspectRatio: 0.72,
-        ),
+        gridDelegate: _isTablet
+            ? const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 220,
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 14,
+                childAspectRatio: 0.72,
+              )
+            : const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 14,
+                childAspectRatio: 0.72,
+              ),
         itemCount: styles.length,
         itemBuilder: (context, index) {
           final style = styles[index];

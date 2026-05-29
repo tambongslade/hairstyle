@@ -16,6 +16,12 @@ class StorageService {
   String? _selectedSalonName;
   String? _selectedSalonLogo;
 
+  // Guest profile (salon-first flow, no account)
+  String? _guestName;
+  String? _guestPhone;
+  String? _guestEmail;
+  String? _guestSessionId;
+
   String? get accessToken => _accessToken;
   String? get refreshToken => _refreshToken;
   String? get userType => _userType;
@@ -23,6 +29,14 @@ class StorageService {
   String? get selectedSalonId => _selectedSalonId;
   String? get selectedSalonName => _selectedSalonName;
   String? get selectedSalonLogo => _selectedSalonLogo;
+  String? get guestName => _guestName;
+  String? get guestPhone => _guestPhone;
+  String? get guestEmail => _guestEmail;
+  String? get guestSessionId => _guestSessionId;
+  bool get hasGuestProfile =>
+      (_guestName?.isNotEmpty ?? false) &&
+      (_guestPhone?.isNotEmpty ?? false) &&
+      (_guestEmail?.isNotEmpty ?? false);
   bool get isLoggedIn => _accessToken != null;
   bool get isAdmin => _userType == 'admin';
   bool get isCustomer => _userType == 'customer';
@@ -39,6 +53,39 @@ class StorageService {
     _selectedSalonId = _prefs?.getString('selected_salon_id');
     _selectedSalonName = _prefs?.getString('selected_salon_name');
     _selectedSalonLogo = _prefs?.getString('selected_salon_logo');
+    _guestName = _prefs?.getString('guest_name');
+    _guestPhone = _prefs?.getString('guest_phone');
+    _guestEmail = _prefs?.getString('guest_email');
+    _guestSessionId = _prefs?.getString('guest_session_id');
+  }
+
+  Future<void> saveGuestProfile({
+    required String name,
+    required String phone,
+    required String email,
+  }) async {
+    _guestName = name;
+    _guestPhone = phone;
+    _guestEmail = email;
+    await _prefs?.setString('guest_name', name);
+    await _prefs?.setString('guest_phone', phone);
+    await _prefs?.setString('guest_email', email);
+  }
+
+  Future<void> saveGuestSessionId(String sessionId) async {
+    _guestSessionId = sessionId;
+    await _prefs?.setString('guest_session_id', sessionId);
+  }
+
+  Future<void> clearGuestProfile() async {
+    _guestName = null;
+    _guestPhone = null;
+    _guestEmail = null;
+    _guestSessionId = null;
+    await _prefs?.remove('guest_name');
+    await _prefs?.remove('guest_phone');
+    await _prefs?.remove('guest_email');
+    await _prefs?.remove('guest_session_id');
   }
 
   Future<void> saveTokens({

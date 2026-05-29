@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../l10n/app_locale.dart';
 import '../../services/admin_service.dart';
+import '../../services/api_client.dart';
+import 'share_link_screen.dart';
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
 
@@ -24,6 +27,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   List<Map<String, dynamic>> _topStyles = [];
   List<Map<String, dynamic>> _recentCustomers = [];
 
+  // Salon (for the share-link card)
+  String? _salonId;
+
   @override
   void initState() {
     super.initState();
@@ -36,7 +42,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _error = null;
     });
     try {
-      final res = await AdminService.instance.getDashboard();
+      final results = await Future.wait([
+        AdminService.instance.getDashboard(),
+        AdminService.instance.getSalon().catchError((_) => <String, dynamic>{}),
+      ]);
+      final res = results[0];
+      final salonRes = results[1];
+      final salonData = (salonRes['data'] ?? salonRes) as Map<String, dynamic>;
+      _salonId = salonData['id']?.toString();
       final data = res['data'] as Map<String, dynamic>? ?? res;
 
       // KPIs - fields are at top level per API spec
@@ -89,6 +102,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       children: [
         const SizedBox(height: 8),
         _buildHeader(),
+        if (_salonId != null) _buildShareLinkCard(),
         _buildQuickStats(),
         _buildTodayBookings(),
         const SizedBox(height: 22),
@@ -154,6 +168,126 @@ class _AdminDashboardState extends State<AdminDashboard> {
           ),
         );
       }
+    );
+  }
+
+  Widget _buildShareLinkCard() {
+    final link = ApiClient.catalogueShareUrl(_salonId!);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ShareLinkScreen()),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppTheme.getGoldDim(context),
+                AppTheme.getBgGlass(context),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: AppTheme.getGold(context).withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.getGold(context).withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.link_rounded,
+                        color: AppTheme.getGold(context), size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Your customer link',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.getTextPrimary(context),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Send this to clients — they book & try on with no signup.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.getTextSecondary(context),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_rounded,
+                      size: 18, color: AppTheme.getTextTertiary(context)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.getBgPrimary(context).withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.getBorder(context)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        link,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.getTextPrimary(context),
+                          fontFamily: 'monospace',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Copy',
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: link));
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Link copied'),
+                            backgroundColor: AppTheme.accentGreen,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.copy_rounded,
+                          size: 18, color: AppTheme.getGold(context)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

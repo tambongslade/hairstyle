@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_locale.dart';
-import '../main.dart';
 import '../services/auth_service.dart';
 import '../services/api_client.dart';
 import 'admin/admin_shell.dart';
@@ -16,7 +15,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  bool _isAdmin = false;
   bool _obscurePassword = true;
   bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
@@ -31,13 +29,13 @@ class _LoginScreenState extends State<LoginScreen> {
       await AuthService.instance.login(
         email: _emailController.text.trim(),
         password: _passwordController.text,
-        userType: _isAdmin ? 'admin' : 'customer',
+        userType: 'admin',
       );
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) =>
-              _isAdmin ? const AdminShell() : const MainShell(),
+              const AdminShell(),
           transitionsBuilder: (_, anim, _, child) {
             return FadeTransition(opacity: anim, child: child);
           },
@@ -65,14 +63,13 @@ class _LoginScreenState extends State<LoginScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _RegisterSheet(
-        onRegistered: (bool isSalonAccount) {
-          // Close the sheet and navigate to the appropriate shell
+        onRegistered: () {
           Navigator.of(ctx).pop();
           if (!mounted) return;
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               pageBuilder: (context, animation, secondaryAnimation) =>
-                  isSalonAccount ? const AdminShell() : const MainShell(),
+                  const AdminShell(),
               transitionsBuilder: (_, anim, _, child) =>
                   FadeTransition(opacity: anim, child: child),
               transitionDuration: const Duration(milliseconds: 400),
@@ -205,102 +202,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 40),
 
-              // Role toggle
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _isAdmin = false),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: !_isAdmin ? AppTheme.teal.withValues(alpha: 0.12) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                            border: !_isAdmin
-                                ? Border.all(color: AppTheme.teal.withValues(alpha: 0.3))
-                                : null,
-                          ),
-                          child: Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.person_outline,
-                                    size: 18,
-                                    color: !_isAdmin
-                                        ? AppTheme.gold
-                                        : Colors.grey.shade400),
-                                const SizedBox(width: 8),
-                                Text(
-                                  tr('customer'),
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: !_isAdmin
-                                        ? AppTheme.gold
-                                        : Colors.grey.shade400,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _isAdmin = true),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: _isAdmin ? AppTheme.teal.withValues(alpha: 0.12) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                            border: _isAdmin
-                                ? Border.all(color: AppTheme.teal.withValues(alpha: 0.3))
-                                : null,
-                          ),
-                          child: Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.admin_panel_settings_outlined,
-                                    size: 18,
-                                    color: _isAdmin
-                                        ? AppTheme.gold
-                                        : Colors.grey.shade400),
-                                const SizedBox(width: 8),
-                                Text(
-                                  tr('admin'),
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: _isAdmin
-                                        ? AppTheme.gold
-                                        : Colors.grey.shade400,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-
               // Welcome text
               Text(
-                _isAdmin ? tr('merchantLogin') : tr('welcomeBack'),
+                tr('merchantLogin'),
                 style: AppTheme.displayFont.copyWith(
                   fontSize: 26,
                   color: Colors.black87,
@@ -308,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                _isAdmin ? tr('merchantSub') : tr('signInSub'),
+                tr('merchantSub'),
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 28),
@@ -318,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 8),
               _buildTextField(
                 controller: _emailController,
-                hint: _isAdmin ? 'salon@business.com' : 'you@email.com',
+                hint: 'salon@business.com',
                 icon: Icons.mail_outline,
                 isEmail: true,
               ),
@@ -366,7 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: _isLoading
                         ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                         : Text(
-                            _isAdmin ? tr('signInDashboard') : tr('signIn'),
+                            tr('signInDashboard'),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
@@ -466,16 +370,12 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ═══════════════════════════════════════════════════════
-//  Premium Registration Sheet (Customer + Salon)
+//  Salon Registration Sheet
 // ═══════════════════════════════════════════════════════
 
-enum _AccountType { customer, salon }
-
 class _RegisterSheet extends StatefulWidget {
-  /// Called when registration succeeds. The argument is `true` if a salon
-  /// account was created (caller should route to AdminShell) and `false`
-  /// for a regular customer.
-  final void Function(bool isSalonAccount) onRegistered;
+  /// Called when salon registration succeeds (caller routes to AdminShell).
+  final VoidCallback onRegistered;
   const _RegisterSheet({required this.onRegistered});
 
   @override
@@ -504,16 +404,12 @@ class _RegisterSheetState extends State<_RegisterSheet> {
   XFile? _logoFile;
   Uint8List? _logoBytes;
 
-  _AccountType? _accountType;
-  int _currentStep = 0; // 0 = chooser, 1 = personal, 2 = salon, 3 = security
+  int _currentStep = 1; // 1 = personal, 2 = salon, 3 = security
   bool _isLoading = false;
   bool _obscurePass = true;
   bool _obscureConfirm = true;
 
-  // Step order depends on account type.
-  List<int> get _steps => _accountType == _AccountType.salon
-      ? const [0, 1, 2, 3]
-      : const [0, 1, 3];
+  static const _steps = [1, 2, 3];
 
   bool get _isLastStep => _currentStep == _steps.last;
 
@@ -602,16 +498,9 @@ class _RegisterSheetState extends State<_RegisterSheet> {
   }
 
   void _goNext() {
-    if (_currentStep == 0) {
-      if (_accountType == null) return;
-      setState(() => _currentStep = 1);
-      return;
-    }
     if (_currentStep == 1) {
       if (!_validatePersonalStep()) return;
-      // For salon, go to salon-info; for customer, jump to security.
-      setState(() =>
-          _currentStep = _accountType == _AccountType.salon ? 2 : 3);
+      setState(() => _currentStep = 2);
       return;
     }
     if (_currentStep == 2) {
@@ -625,11 +514,7 @@ class _RegisterSheetState extends State<_RegisterSheet> {
   }
 
   void _goBack() {
-    if (_currentStep == 0) return;
-    if (_currentStep == 3 && _accountType == _AccountType.customer) {
-      setState(() => _currentStep = 1);
-      return;
-    }
+    if (_currentStep <= 1) return;
     setState(() => _currentStep = _currentStep - 1);
   }
 
@@ -638,28 +523,19 @@ class _RegisterSheetState extends State<_RegisterSheet> {
 
     setState(() => _isLoading = true);
     try {
-      if (_accountType == _AccountType.salon) {
-        await AuthService.instance.registerAdmin(
-          name: _nameCtrl.text.trim(),
-          email: _emailCtrl.text.trim(),
-          password: _passCtrl.text,
-          phone: _phoneCtrl.text.trim(),
-          salonName: _salonNameCtrl.text.trim(),
-          salonLocation: _salonLocationCtrl.text.trim(),
-          salonPhone: _salonPhoneCtrl.text.trim(),
-          salonDescription: _salonDescCtrl.text.trim(),
-          logo: _logoFile,
-        );
-      } else {
-        await AuthService.instance.registerCustomer(
-          name: _nameCtrl.text.trim(),
-          email: _emailCtrl.text.trim(),
-          password: _passCtrl.text,
-          phone: _phoneCtrl.text.trim(),
-        );
-      }
+      await AuthService.instance.registerAdmin(
+        name: _nameCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        password: _passCtrl.text,
+        phone: _phoneCtrl.text.trim(),
+        salonName: _salonNameCtrl.text.trim(),
+        salonLocation: _salonLocationCtrl.text.trim(),
+        salonPhone: _salonPhoneCtrl.text.trim(),
+        salonDescription: _salonDescCtrl.text.trim(),
+        logo: _logoFile,
+      );
       if (!mounted) return;
-      widget.onRegistered(_accountType == _AccountType.salon);
+      widget.onRegistered();
     } on ApiException catch (e) {
       if (!mounted) return;
       _snack(e.message);
@@ -710,9 +586,7 @@ class _RegisterSheetState extends State<_RegisterSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _currentStep == 0
-                                  ? tr('chooseAccountType')
-                                  : tr('registerTitle'),
+                              tr('registerTitle'),
                               style: AppTheme.displayFont.copyWith(
                                 fontSize: 24,
                                 color: Colors.black87,
@@ -720,9 +594,7 @@ class _RegisterSheetState extends State<_RegisterSheet> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _currentStep == 0
-                                  ? tr('chooseAccountTypeSub')
-                                  : tr('signInSub'),
+                              tr('signInSub'),
                               style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
                             ),
                           ],
@@ -745,13 +617,12 @@ class _RegisterSheetState extends State<_RegisterSheet> {
 
                 const SizedBox(height: 20),
 
-                if (_currentStep > 0)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: _buildStepIndicator(),
-                  ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: _buildStepIndicator(),
+                ),
 
-                if (_currentStep > 0) const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 Expanded(
                   child: ListView(
@@ -763,17 +634,14 @@ class _RegisterSheetState extends State<_RegisterSheet> {
                       const SizedBox(height: 28),
 
                       GestureDetector(
-                        onTap: _isLoading || (_currentStep == 0 && _accountType == null)
-                            ? null
-                            : _goNext,
+                        onTap: _isLoading ? null : _goNext,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
                           width: double.infinity,
                           height: 54,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: (_isLoading ||
-                                      (_currentStep == 0 && _accountType == null))
+                              colors: _isLoading
                                   ? [Colors.grey.shade400, Colors.grey.shade400]
                                   : [AppTheme.navy, AppTheme.navyLight],
                             ),
@@ -816,7 +684,7 @@ class _RegisterSheetState extends State<_RegisterSheet> {
                         ),
                       ),
 
-                      if (_currentStep > 0) ...[
+                      if (_currentStep > 1) ...[
                         const SizedBox(height: 14),
                         Center(
                           child: GestureDetector(
@@ -862,8 +730,6 @@ class _RegisterSheetState extends State<_RegisterSheet> {
 
   Widget _buildStepContent() {
     switch (_currentStep) {
-      case 0:
-        return _buildChooserStep();
       case 1:
         return _buildPersonalStep();
       case 2:
@@ -876,11 +742,9 @@ class _RegisterSheetState extends State<_RegisterSheet> {
   }
 
   Widget _buildStepIndicator() {
-    // Build a labelled dot for each visible step (after the chooser).
     final entries = <_StepInfo>[
       _StepInfo(1, tr('personalInfo')),
-      if (_accountType == _AccountType.salon)
-        _StepInfo(2, tr('salonInfo')),
+      _StepInfo(2, tr('salonInfo')),
       _StepInfo(3, tr('security')),
     ];
 
@@ -901,30 +765,6 @@ class _RegisterSheetState extends State<_RegisterSheet> {
       }
     }
     return Row(children: widgets);
-  }
-
-  Widget _buildChooserStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 8),
-        _AccountTypeCard(
-          icon: Icons.person_outline_rounded,
-          title: tr('customerAccount'),
-          subtitle: tr('customerAccountSub'),
-          selected: _accountType == _AccountType.customer,
-          onTap: () => setState(() => _accountType = _AccountType.customer),
-        ),
-        const SizedBox(height: 14),
-        _AccountTypeCard(
-          icon: Icons.storefront_outlined,
-          title: tr('salonAccount'),
-          subtitle: tr('salonAccountSub'),
-          selected: _accountType == _AccountType.salon,
-          onTap: () => setState(() => _accountType = _AccountType.salon),
-        ),
-      ],
-    );
   }
 
   Widget _buildPersonalStep() {
@@ -1268,88 +1108,3 @@ class _StepInfo {
   const _StepInfo(this.step, this.label);
 }
 
-class _AccountTypeCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _AccountTypeCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: selected ? AppTheme.teal.withValues(alpha: 0.08) : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? AppTheme.teal : Colors.grey.shade200,
-            width: selected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 52, height: 52,
-              decoration: BoxDecoration(
-                color: selected ? AppTheme.teal : Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected ? AppTheme.teal : Colors.grey.shade200,
-                ),
-              ),
-              child: Icon(icon, color: selected ? Colors.white : AppTheme.navy, size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 22, height: 22,
-              decoration: BoxDecoration(
-                color: selected ? AppTheme.teal : Colors.transparent,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected ? AppTheme.teal : Colors.grey.shade300,
-                  width: 2,
-                ),
-              ),
-              child: selected
-                  ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
-                  : null,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

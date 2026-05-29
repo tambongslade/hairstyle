@@ -7,11 +7,17 @@ import '../widgets/glass_card.dart';
 import '../widgets/app_toast.dart';
 import '../services/api_client.dart';
 import '../services/customer_service.dart';
+import '../services/public_service.dart';
 import '../services/storage_service.dart';
+import 'guest/guest_info_sheet.dart';
 import 'salon_screen.dart';
 
 class BookingScreen extends StatefulWidget {
-  const BookingScreen({super.key});
+  /// When true, the screen uses the unauthenticated /public/salons endpoints
+  /// and collects the guest's name/phone/email instead of relying on an
+  /// account.
+  final bool guestMode;
+  const BookingScreen({super.key, this.guestMode = false});
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();
@@ -20,6 +26,8 @@ class BookingScreen extends StatefulWidget {
 class _BookingScreenState extends State<BookingScreen> {
   bool _isBooking = false;
   int _currentStep = 0; // 0=category, 1=style, 2=date/time, 3=confirm
+
+  bool get _guest => widget.guestMode;
 
   // Selections
   String _selectedGender = 'women';
@@ -53,11 +61,15 @@ class _BookingScreenState extends State<BookingScreen> {
   void initState() {
     super.initState();
     if (_hasSalon) _fetchInitialData();
+    if (_guest) {
+      // Guest mode skips the bookings list — drop straight into the flow.
+      _isBooking = true;
+    }
   }
 
   Future<void> _fetchInitialData() async {
     _fetchStyles();
-    _fetchMyBookings();
+    if (!_guest) _fetchMyBookings();
   }
 
   // ── Styles ──
@@ -65,19 +77,34 @@ class _BookingScreenState extends State<BookingScreen> {
     setState(() { _loadingStyles = true; _stylesError = null; });
     try {
       final allItems = <Map<String, dynamic>>[];
-      int page = 1;
-      bool hasMore = true;
-      while (hasMore) {
-        final res = await CustomerService.instance.getStyles(query: {'page': page.toString(), 'limit': '50'});
-        final raw = res['items'] ?? res['styles'] ?? res['data'] ?? res;
-        final data = raw is List ? raw : (raw is Map ? (raw['items'] ?? raw['styles'] ?? []) : []);
-        if (data is List && data.isNotEmpty) {
-          allItems.addAll(List<Map<String, dynamic>>.from(data));
-          final total = res['totalPages'] ?? res['total'];
-          hasMore = total is int ? page < total : data.length >= 50;
-          page++;
-        } else {
-          hasMore = false;
+      if (_guest) {
+        // Guest mode: pull styles from the salon catalogue (no auth, no paging).
+        final salonId = _salonId;
+        if (salonId == null) {
+          if (mounted) setState(() { _loadingStyles = false; });
+          return;
+        }
+        final res = await PublicService.instance.getCatalogue(salonId);
+        final data = (res['data'] ?? res) as Map<String, dynamic>;
+        final raw = data['styles'] ?? data['hairstyles'] ?? [];
+        if (raw is List) {
+          allItems.addAll(List<Map<String, dynamic>>.from(raw.whereType<Map>()));
+        }
+      } else {
+        int page = 1;
+        bool hasMore = true;
+        while (hasMore) {
+          final res = await CustomerService.instance.getStyles(query: {'page': page.toString(), 'limit': '50'});
+          final raw = res['items'] ?? res['styles'] ?? res['data'] ?? res;
+          final data = raw is List ? raw : (raw is Map ? (raw['items'] ?? raw['styles'] ?? []) : []);
+          if (data is List && data.isNotEmpty) {
+            allItems.addAll(List<Map<String, dynamic>>.from(data));
+            final total = res['totalPages'] ?? res['total'];
+            hasMore = total is int ? page < total : data.length >= 50;
+            page++;
+          } else {
+            hasMore = false;
+          }
         }
       }
       if (mounted) setState(() { _allStyles = allItems; _loadingStyles = false; });
@@ -126,7 +153,9 @@ class _BookingScreenState extends State<BookingScreen> {
     if (_salonId == null) return;
     setState(() { _loadingDates = true; _availableDates = []; _timeSlots = []; _selectedDateIndex = 0; _selectedTimeIndex = -1; });
     try {
-      final res = await CustomerService.instance.getAvailableDates(salonId: _salonId!);
+      final res = _guest
+          ? await PublicService.instance.getAvailableDates(_salonId!)
+          : await CustomerService.instance.getAvailableDates(salonId: _salonId!);
       final data = res['data'] ?? res;
       final list = data is List ? data : (data is Map ? (data['dates'] ?? []) : []);
       if (list is List && mounted) {
@@ -151,7 +180,9 @@ class _BookingScreenState extends State<BookingScreen> {
 
     setState(() { _loadingTimes = true; _timeSlots = []; _selectedTimeIndex = -1; });
     try {
-      final res = await CustomerService.instance.getAvailableTimes(salonId: _salonId!, date: dateStr);
+      final res = _guest
+          ? await PublicService.instance.getAvailableTimes(_salonId!, date: dateStr)
+          : await CustomerService.instance.getAvailableTimes(salonId: _salonId!, date: dateStr);
       final data = res['data'] ?? res;
       final isOpen = data['isOpen'] ?? true;
       final slots = data['slots'] as List? ?? [];
@@ -191,7 +222,14 @@ class _BookingScreenState extends State<BookingScreen> {
     if (_allStyles.isEmpty && !_loadingStyles) _fetchStyles();
   }
 
-  void _cancelBookingFlow() => setState(() { _isBooking = false; _currentStep = 0; });
+  void _cancelBookingFlow() {
+    if (_guest) {
+      // Guest mode has no landing list — go back to step 0 instead of leaving.
+      setState(() => _currentStep = 0);
+      return;
+    }
+    setState(() { _isBooking = false; _currentStep = 0; });
+  }
 
   void _nextStep() {
     if (_currentStep == 1) _fetchAvailableDates();
@@ -203,19 +241,44 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _confirmBooking() async {
+    if (_guest && !StorageService.instance.hasGuestProfile) {
+      final saved = await GuestInfoSheet.show(context);
+      if (saved != true) return;
+    }
     setState(() => _submitting = true);
     try {
-      await CustomerService.instance.createBooking({
-        'salonId': _salonId,
-        'date': _selectedDateStr,
-        'time': _selectedTimeStr,
-        if (_selectedStyle != null) 'styleId': _selectedStyle!['id']?.toString() ?? '',
-        if (_selectedStyle?['notes'] != null) 'notes': _selectedStyle!['notes'],
-      });
+      if (_guest) {
+        final s = StorageService.instance;
+        await PublicService.instance.createGuestBooking(
+          _salonId!,
+          clientName: s.guestName ?? '',
+          clientPhone: s.guestPhone ?? '',
+          clientEmail: s.guestEmail ?? '',
+          date: _selectedDateStr,
+          time: _selectedTimeStr,
+          styleId: _selectedStyle?['id']?.toString(),
+          notes: _selectedStyle?['notes']?.toString(),
+        );
+      } else {
+        await CustomerService.instance.createBooking({
+          'salonId': _salonId,
+          'date': _selectedDateStr,
+          'time': _selectedTimeStr,
+          if (_selectedStyle != null) 'styleId': _selectedStyle!['id']?.toString() ?? '',
+          if (_selectedStyle?['notes'] != null) 'notes': _selectedStyle!['notes'],
+        });
+      }
       if (!mounted) return;
       AppToast.show(context, message: tr('appointmentConfirmed'), type: ToastType.success);
       Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) { setState(() => _isBooking = false); _fetchMyBookings(); }
+        if (!mounted) return;
+        if (_guest) {
+          // Guest mode has no bookings list to fall back to — restart the flow.
+          _startBooking();
+        } else {
+          setState(() => _isBooking = false);
+          _fetchMyBookings();
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -530,7 +593,7 @@ class _BookingScreenState extends State<BookingScreen> {
         const SizedBox(height: 8),
         Text(tr('noSalonConnectedSub'), style: TextStyle(fontSize: 13, color: AppTheme.getTextSecondary(context)), textAlign: TextAlign.center),
         const SizedBox(height: 24),
-        GoldButton(text: tr('findSalon'), onPressed: _openSalonSelector),
+        if (!_guest) GoldButton(text: tr('findSalon'), onPressed: _openSalonSelector),
       ],
     )),
   );

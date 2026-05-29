@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -8,12 +9,17 @@ import '../theme/app_theme.dart';
 import '../l10n/app_locale.dart';
 import '../services/api_client.dart';
 import '../services/customer_service.dart';
+import '../services/public_service.dart';
 import '../services/storage_service.dart';
 import '../services/tryon_cache_service.dart';
 import '../widgets/app_toast.dart';
+import 'guest/guest_info_sheet.dart';
 
 class TryOnScreen extends StatefulWidget {
-  const TryOnScreen({super.key});
+  /// When true, the screen uses the unauthenticated /public/salons endpoints
+  /// and routes WebSocket progress through a guest sessionId room.
+  final bool guestMode;
+  const TryOnScreen({super.key, this.guestMode = false});
 
   @override
   State<TryOnScreen> createState() => _TryOnScreenState();
@@ -84,6 +90,23 @@ class _TryOnScreenState extends State<TryOnScreen>
   // Simulated progress fallback when socket events don't arrive
   bool _socketProgressReceived = false;
 
+  bool get _guest => widget.guestMode;
+  String? _guestSessionId;
+
+  Future<String> _ensureGuestSessionId() async {
+    if (_guestSessionId != null) return _guestSessionId!;
+    final existing = StorageService.instance.guestSessionId;
+    if (existing != null && existing.isNotEmpty) {
+      _guestSessionId = existing;
+      return existing;
+    }
+    final rng = math.Random();
+    final id = 'g-${DateTime.now().millisecondsSinceEpoch}-${rng.nextInt(1 << 32).toRadixString(16)}';
+    await StorageService.instance.saveGuestSessionId(id);
+    _guestSessionId = id;
+    return id;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -118,20 +141,23 @@ class _TryOnScreenState extends State<TryOnScreen>
     _connectSocket();
   }
 
-  void _connectSocket() {
-    final userId = StorageService.instance.userId ?? '';
+  void _connectSocket() async {
+    final roomKey = _guest
+        ? await _ensureGuestSessionId()
+        : (StorageService.instance.userId ?? '');
+    final queryField = _guest ? 'sessionId' : 'customerId';
     _socket = IO.io(
       '${ApiClient.serverUrl}/try-on',
       IO.OptionBuilder()
           .setTransports(['websocket'])
-          .setQuery({'customerId': userId})
+          .setQuery({queryField: roomKey})
           .disableAutoConnect()
           .enableReconnection()
           .build(),
     );
 
     _socket!.onConnect((_) {
-      debugPrint('[TryOn] Socket connected (id=${_socket?.id}, url=${ApiClient.serverUrl}/try-on, userId=$userId)');
+      debugPrint('[TryOn] Socket connected (id=${_socket?.id}, url=${ApiClient.serverUrl}/try-on, $queryField=$roomKey)');
     });
     _socket!.onDisconnect((reason) {
       debugPrint('[TryOn] Socket disconnected (reason=$reason)');
@@ -176,7 +202,7 @@ class _TryOnScreenState extends State<TryOnScreen>
       _sparkleController.stop();
     });
 
-    debugPrint('[TryOn] Connecting socket to ${ApiClient.serverUrl}/try-on with userId=$userId...');
+    debugPrint('[TryOn] Connecting socket to ${ApiClient.serverUrl}/try-on with $queryField=$roomKey...');
     _socket!.connect();
   }
 
@@ -187,33 +213,47 @@ class _TryOnScreenState extends State<TryOnScreen>
 
   Future<void> _fetchStyles() async {
     try {
-      // Fetch all styles with a high limit to get everything (48+ styles)
       final allItems = <Map<String, dynamic>>[];
-      int page = 1;
-      bool hasMore = true;
 
-      while (hasMore) {
-        final response = await CustomerService.instance.getStyles(query: {
-          'page': page.toString(),
-          'limit': '50',
-        });
-        final raw = response['items'] ?? response['styles'] ?? response['data'] ?? response;
-        final data = raw is List ? raw : (raw is Map ? (raw['items'] ?? raw['styles'] ?? []) : []);
-
-        if (data is List && data.isNotEmpty) {
-          allItems.addAll(List<Map<String, dynamic>>.from(data));
-          // Check if there are more pages
-          final total = response['total'] ?? response['totalPages'];
-          final currentPage = response['page'] ?? page;
-          if (total is int && currentPage is int) {
-            hasMore = currentPage < total;
-          } else {
-            // If no pagination info, check if we got a full page
-            hasMore = data.length >= 50;
+      if (_guest) {
+        // Guest mode: styles come from the salon catalogue (no auth, no paging).
+        final salonId = StorageService.instance.selectedSalonId;
+        if (salonId != null) {
+          final res = await PublicService.instance.getCatalogue(salonId);
+          final data = (res['data'] ?? res) as Map<String, dynamic>;
+          final raw = data['styles'] ?? data['hairstyles'] ?? [];
+          if (raw is List) {
+            allItems.addAll(List<Map<String, dynamic>>.from(raw.whereType<Map>()));
           }
-          page++;
-        } else {
-          hasMore = false;
+        }
+      } else {
+        // Fetch all styles with a high limit to get everything (48+ styles)
+        int page = 1;
+        bool hasMore = true;
+
+        while (hasMore) {
+          final response = await CustomerService.instance.getStyles(query: {
+            'page': page.toString(),
+            'limit': '50',
+          });
+          final raw = response['items'] ?? response['styles'] ?? response['data'] ?? response;
+          final data = raw is List ? raw : (raw is Map ? (raw['items'] ?? raw['styles'] ?? []) : []);
+
+          if (data is List && data.isNotEmpty) {
+            allItems.addAll(List<Map<String, dynamic>>.from(data));
+            // Check if there are more pages
+            final total = response['total'] ?? response['totalPages'];
+            final currentPage = response['page'] ?? page;
+            if (total is int && currentPage is int) {
+              hasMore = currentPage < total;
+            } else {
+              // If no pagination info, check if we got a full page
+              hasMore = data.length >= 50;
+            }
+            page++;
+          } else {
+            hasMore = false;
+          }
         }
       }
 
@@ -436,6 +476,14 @@ class _TryOnScreenState extends State<TryOnScreen>
   Future<void> _generateTryOn({bool skipCache = false}) async {
     if (_userPhoto == null || _selectedStyle == null || _userPhotoFile == null) return;
 
+    // Guest mode requires name/phone/email to persist the try-on row.
+    if (_guest && !StorageService.instance.hasGuestProfile) {
+      final saved = await GuestInfoSheet.show(context,
+          title: 'Before we try a style',
+          subtitle: 'The salon needs these details so they can reach out about your look.');
+      if (saved != true) return;
+    }
+
     final style = _selectedStyle!;
     final styleId = style['id']?.toString() ?? style['name']?.toString() ?? '';
 
@@ -472,15 +520,39 @@ class _TryOnScreenState extends State<TryOnScreen>
     _runSimulatedProgress();
 
     try {
-      final result = await CustomerService.instance.generateTryOnWithPhoto(
-        photo: _userPhotoFile!,
-        fields: {
-          'styleName': style['name']?.toString() ?? '',
-          'styleDescription': style['description']?.toString() ?? '',
-          if (_selectedColorIndex > 0) 'hairColor': _hairColorNames[_selectedColorIndex],
-          if (style['id'] != null) 'styleId': style['id'].toString(),
-        },
-      );
+      Map<String, dynamic> result;
+      if (_guest) {
+        final salonId = StorageService.instance.selectedSalonId;
+        if (salonId == null) {
+          throw Exception('No salon selected');
+        }
+        final sessionId = await _ensureGuestSessionId();
+        final s = StorageService.instance;
+        result = await PublicService.instance.generateGuestTryOn(
+          salonId,
+          photo: _userPhotoFile!,
+          sessionId: sessionId,
+          fields: {
+            'clientName': s.guestName ?? '',
+            'clientPhone': s.guestPhone ?? '',
+            'clientEmail': s.guestEmail ?? '',
+            'styleName': style['name']?.toString() ?? '',
+            'styleDescription': style['description']?.toString() ?? '',
+            if (_selectedColorIndex > 0) 'hairColor': _hairColorNames[_selectedColorIndex],
+            if (style['id'] != null) 'styleId': style['id'].toString(),
+          },
+        );
+      } else {
+        result = await CustomerService.instance.generateTryOnWithPhoto(
+          photo: _userPhotoFile!,
+          fields: {
+            'styleName': style['name']?.toString() ?? '',
+            'styleDescription': style['description']?.toString() ?? '',
+            if (_selectedColorIndex > 0) 'hairColor': _hairColorNames[_selectedColorIndex],
+            if (style['id'] != null) 'styleId': style['id'].toString(),
+          },
+        );
+      }
       if (!mounted) return;
 
       Uint8List? imageBytes;

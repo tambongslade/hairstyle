@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'storage_service.dart';
 
@@ -18,6 +19,15 @@ class ApiException implements Exception {
 class ApiClient {
   static const String baseUrl = 'https://api.lisbeauty.evols.online/api/v1';
   static const String serverUrl = 'https://api.lisbeauty.evols.online';
+
+  /// Public origin of the customer-facing web app. Used to build the
+  /// salon-catalogue share link the salon sends to its clients.
+  static const String webBaseUrl = 'https://lisbeauty.evols.online';
+
+  /// Returns the public share link for [salonId] — what a salon owner sends
+  /// to a client so they can browse, book, and run AI try-ons as a guest.
+  static String catalogueShareUrl(String salonId) =>
+      '$webBaseUrl/c/$salonId';
 
   /// Global navigator key — set from MaterialApp so we can redirect on auth failure
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -94,7 +104,11 @@ class ApiClient {
 
   void _redirectToLogin() {
     final ctx = navigatorKey.currentContext;
-    if (ctx != null) {
+    if (ctx == null) return;
+    try {
+      GoRouter.of(ctx).go('/admin');
+    } catch (_) {
+      // Fall back to the legacy named-route path if go_router isn't mounted.
       Navigator.of(ctx).pushNamedAndRemoveUntil('/login', (_) => false);
     }
   }

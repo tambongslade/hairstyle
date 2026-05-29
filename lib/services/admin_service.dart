@@ -169,6 +169,30 @@ class AdminService {
   Future<Map<String, dynamic>> getLoyaltyAnalytics() =>
       _api.get('/admin/analytics/loyalty');
 
+  // ── Loyalty (salon-scoped client roster) ──
+  Future<Map<String, dynamic>> getLoyaltyClients({
+    int page = 1,
+    int limit = 20,
+    String? search,
+  }) =>
+      _api.get('/admin/loyalty/clients', queryParams: {
+        'page': page.toString(),
+        'limit': limit.toString(),
+        if (search != null && search.isNotEmpty) 'search': search,
+      });
+
+  Future<Map<String, dynamic>> getLoyaltyClient(String id) =>
+      _api.get('/admin/loyalty/clients/$id');
+
+  Future<Map<String, dynamic>> getLoyaltyProgramAnalytics() =>
+      _api.get('/admin/loyalty/analytics');
+
+  /// Award / redeem / stamp / record a visit for a client. Body shape:
+  /// `{clientPhone, clientName?, clientEmail?, type?: earn|redeem|visit|adjust,
+  ///   points?, stamps?, visits?, description?}`. Upserts the client by phone.
+  Future<Map<String, dynamic>> awardLoyalty(Map<String, dynamic> body) =>
+      _api.post('/admin/loyalty/clients/award', body: body);
+
   // ── Settings ──
   Future<Map<String, dynamic>> getLoyaltyConfig() =>
       _api.get('/admin/settings/loyalty-config');

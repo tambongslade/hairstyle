@@ -4,6 +4,7 @@ import '../../theme/app_theme.dart';
 import '../../l10n/app_locale.dart';
 import '../../services/admin_service.dart';
 import '../../services/api_client.dart';
+import 'clients_screen.dart';
 import 'share_link_screen.dart';
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -30,6 +31,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
   // Salon (for the share-link card)
   String? _salonId;
 
+  // Loyalty program snapshot for the clients card
+  int? _loyaltyMembers;
+  int? _loyaltyOutstanding;
+
   @override
   void initState() {
     super.initState();
@@ -45,11 +50,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final results = await Future.wait([
         AdminService.instance.getDashboard(),
         AdminService.instance.getSalon().catchError((_) => <String, dynamic>{}),
+        AdminService.instance
+            .getLoyaltyProgramAnalytics()
+            .catchError((_) => <String, dynamic>{}),
       ]);
       final res = results[0];
       final salonRes = results[1];
+      final loyaltyRes = results[2];
       final salonData = (salonRes['data'] ?? salonRes) as Map<String, dynamic>;
       _salonId = salonData['id']?.toString();
+      final loyaltyData =
+          (loyaltyRes['data'] ?? loyaltyRes) as Map<String, dynamic>;
+      _loyaltyMembers = (loyaltyData['activeMembers'] ??
+          loyaltyData['totalMembers'] ??
+          loyaltyData['members']) as int?;
+      _loyaltyOutstanding = (loyaltyData['outstandingPoints'] ??
+          loyaltyData['pointsOutstanding']) as int?;
       final data = res['data'] as Map<String, dynamic>? ?? res;
 
       // KPIs - fields are at top level per API spec
@@ -103,6 +119,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         const SizedBox(height: 8),
         _buildHeader(),
         if (_salonId != null) _buildShareLinkCard(),
+        _buildClientsCard(),
         _buildQuickStats(),
         _buildTodayBookings(),
         const SizedBox(height: 22),
@@ -284,6 +301,72 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ],
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClientsCard() {
+    final members = _loyaltyMembers;
+    final outstanding = _loyaltyOutstanding;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ClientsScreen()),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.getBgSecondary(context),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.getBorder(context)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.accentBlue.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.people_alt_outlined,
+                    color: AppTheme.accentBlue, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Clients & loyalty',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.getTextPrimary(context),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      members == null
+                          ? 'View roster · award points · track tiers'
+                          : '${members} member${members == 1 ? "" : "s"}'
+                              '${outstanding == null ? "" : " · ${outstanding} pts outstanding"}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.getTextSecondary(context),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_rounded,
+                  size: 18, color: AppTheme.getTextTertiary(context)),
             ],
           ),
         ),

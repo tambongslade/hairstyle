@@ -22,6 +22,7 @@ class _AdminShellState extends State<AdminShell> {
   static const _outlinedIcons = [
     Icons.space_dashboard_outlined,
     Icons.event_note_outlined,
+    Icons.auto_fix_high_outlined,
     Icons.style_outlined,
     Icons.analytics_outlined,
     Icons.tune_outlined,
@@ -30,6 +31,7 @@ class _AdminShellState extends State<AdminShell> {
   static const _filledIcons = [
     Icons.space_dashboard_rounded,
     Icons.event_note_rounded,
+    Icons.auto_fix_high_rounded,
     Icons.style_rounded,
     Icons.analytics_rounded,
     Icons.tune_rounded,
@@ -52,6 +54,7 @@ class _AdminShellState extends State<AdminShell> {
   List<String> get _labels => [
     tr('adminDashboard'),
     tr('adminBookings'),
+    tr('tabTryOn'),
     tr('adminCatalog'),
     tr('adminAnalytics'),
     tr('adminSettings'),
@@ -84,39 +87,10 @@ class _AdminShellState extends State<AdminShell> {
           child: _buildScreen(),
         ),
       ),
-      floatingActionButton: _currentIndex == 0
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => Scaffold(
-                      backgroundColor: AppTheme.getBgPrimary(context),
-                      appBar: AppBar(
-                        backgroundColor: Colors.transparent,
-                        elevation: 0,
-                        leading: IconButton(
-                          icon: Icon(Icons.arrow_back, color: AppTheme.getTextPrimary(context)),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                        title: Text(tr('virtualTryOn'),
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.getTextPrimary(context))),
-                        centerTitle: true,
-                      ),
-                      body: const SafeArea(child: TryOnScreen()),
-                    ),
-                  ),
-                );
-              },
-              backgroundColor: AppTheme.getGold(context),
-              elevation: 4,
-              child: const Icon(Icons.content_cut_rounded, color: Colors.white, size: 24),
-            )
-          : null,
       bottomNavigationBar: LiquidGlassNavBar(
         currentIndex: _currentIndex,
         onTap: (i) => setState(() => _currentIndex = i),
-        tabs: List.generate(5, (i) => LiquidGlassTab(
+        tabs: List.generate(_labels.length, (i) => LiquidGlassTab(
           icon: _outlinedIcons[i],
           activeIcon: _filledIcons[i],
           label: labels[i],
@@ -132,10 +106,12 @@ class _AdminShellState extends State<AdminShell> {
       case 1:
         return const AdminBookings(key: ValueKey('admin-book'));
       case 2:
-        return const AdminCatalog(key: ValueKey('admin-catalog'));
+        return const TryOnScreen(key: ValueKey('admin-tryon'));
       case 3:
-        return const AdminAnalytics(key: ValueKey('admin-analytics'));
+        return const AdminCatalog(key: ValueKey('admin-catalog'));
       case 4:
+        return const AdminAnalytics(key: ValueKey('admin-analytics'));
+      case 5:
         return const AdminSettings(key: ValueKey('admin-settings'));
       default:
         return const AdminDashboard(key: ValueKey('admin-dash'));

@@ -43,6 +43,17 @@ class PublicService {
         if (notes != null && notes.isNotEmpty) 'notes': notes,
       });
 
+  /// Public guest fidelity lookup. Returns 404 if the phone isn't enrolled
+  /// at this salon. The `+` in international phone numbers MUST be encoded
+  /// as `%2B` — http's queryParameters do this automatically, but if you ever
+  /// build the URL by hand, remember.
+  Future<Map<String, dynamic>> lookupGuestLoyalty(
+    String salonId, {
+    required String phone,
+  }) =>
+      _api.get('/public/salons/$salonId/loyalty/lookup',
+          auth: false, queryParams: {'phone': phone});
+
   Future<Map<String, dynamic>> generateGuestTryOn(
     String salonId, {
     required XFile photo,

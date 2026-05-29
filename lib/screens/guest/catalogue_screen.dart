@@ -6,6 +6,7 @@ import '../../services/public_service.dart';
 import '../../services/storage_service.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/gold_button.dart';
+import 'guest_loyalty_screen.dart';
 
 /// Salon catalogue (guest-facing). Single salon, no auth — everything is
 /// fetched from /public/salons/:salonId/catalogue.
@@ -128,6 +129,8 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
           _buildHeader(),
           const SizedBox(height: 18),
           _buildCtas(),
+          const SizedBox(height: 14),
+          _buildMyPointsRow(),
           const SizedBox(height: 24),
           if (_styles.isNotEmpty) _buildStylesGrid(),
           if (_services.isNotEmpty) ...[
@@ -242,6 +245,67 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMyPointsRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const GuestLoyaltyScreen()),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.getBgGlass(context),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.getBorder(context)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.getGold(context).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.workspace_premium_rounded,
+                    color: AppTheme.getGold(context), size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'My points',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.getTextPrimary(context),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Track your tier, rewards, and visits.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.getTextSecondary(context),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_rounded,
+                  size: 16, color: AppTheme.getTextTertiary(context)),
+            ],
+          ),
+        ),
       ),
     );
   }

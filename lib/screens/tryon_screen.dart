@@ -1165,7 +1165,8 @@ class _TryOnScreenState extends State<TryOnScreen>
                         style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5)),
+                            letterSpacing: 0.5,
+                            color: Colors.white)),
                   ),
                 ),
               ),

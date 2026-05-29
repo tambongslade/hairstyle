@@ -172,6 +172,32 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Opens the daily tip detail in a draggable bottom sheet
+  void _showTipDetail(Map<String, dynamic> data) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _TipDetailSheet(data: data),
+    );
+  }
+
+  /// Opens the inspiration detail in a draggable bottom sheet
+  void _showInspirationDetail(Map<String, dynamic> data) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _InspirationDetailSheet(
+        data: data,
+        onStyleTap: () {
+          Navigator.pop(context);
+          onTabSwitch(1);
+        },
+      ),
+    );
+  }
+
   /// Shows a bottom sheet with followed salons for quick switching
   void _showSalonSwitcher() async {
     showModalBottomSheet(
@@ -483,45 +509,57 @@ class _HomeScreenState extends State<HomeScreen> {
     final body = data['body']?.toString() ?? data['content']?.toString() ?? '';
     final coverUrl = ApiClient.getImageUrl(data['coverImageUrl']?.toString() ?? data['imageUrl']?.toString() ?? '');
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      decoration: BoxDecoration(
-        color: AppTheme.getBgGlass(context),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.getBorder(context)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (coverUrl.isNotEmpty)
-            SizedBox(
-              width: 90, height: 100,
-              child: Image.network(coverUrl, fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(color: AppTheme.getBgGlass(context),
-                      child: Icon(Icons.lightbulb_outline, size: 28, color: AppTheme.getTextTertiary(context)))),
-            ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tr('dailyTip'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
-                      color: AppTheme.getTextTertiary(context), letterSpacing: 0.3)),
-                  const SizedBox(height: 4),
-                  Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.getTextPrimary(context)),
-                      maxLines: 2, overflow: TextOverflow.ellipsis),
-                  if (body.isNotEmpty) ...[
+    return GestureDetector(
+      onTap: () => _showTipDetail(data),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+        decoration: BoxDecoration(
+          color: AppTheme.getBgGlass(context),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.getBorder(context)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (coverUrl.isNotEmpty)
+              SizedBox(
+                width: 90, height: 100,
+                child: Image.network(coverUrl, fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(color: AppTheme.getBgGlass(context),
+                        child: Icon(Icons.lightbulb_outline, size: 28, color: AppTheme.getTextTertiary(context)))),
+              ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tr('dailyTip'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                        color: AppTheme.getTextTertiary(context), letterSpacing: 0.3)),
                     const SizedBox(height: 4),
-                    Text(body, style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context), height: 1.4),
+                    Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.getTextPrimary(context)),
                         maxLines: 2, overflow: TextOverflow.ellipsis),
+                    if (body.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(body, style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context), height: 1.4),
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                    ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Text(tr('readMore'),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.getGold(context))),
+                        const SizedBox(width: 2),
+                        Icon(Icons.chevron_right, size: 14, color: AppTheme.getGold(context)),
+                      ],
+                    ),
                   ],
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -632,44 +670,81 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          child: Text(tr('inspiration'), style: AppTheme.displayFont.copyWith(fontSize: 17, color: AppTheme.getTextPrimary(context))),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(tr('inspiration'), style: AppTheme.displayFont.copyWith(fontSize: 17, color: AppTheme.getTextPrimary(context))),
+              GestureDetector(
+                onTap: () => _showInspirationDetail(data),
+                child: Row(
+                  children: [
+                    Text(tr('readMore'),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.getGold(context))),
+                    Icon(Icons.chevron_right, size: 16, color: AppTheme.getGold(context)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         if (coverUrl.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-            height: 170,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.network(coverUrl, fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(color: AppTheme.getBgGlass(context))),
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Color(0xBB000000)],
-                      stops: [0.4, 1.0],
+          GestureDetector(
+            onTap: () => _showInspirationDetail(data),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              height: 170,
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(coverUrl, fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(color: AppTheme.getBgGlass(context))),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Color(0xBB000000)],
+                        stops: [0.4, 1.0],
+                      ),
                     ),
                   ),
-                ),
-                Positioned(
-                  bottom: 14, left: 14, right: 14,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white,
-                          shadows: [Shadow(offset: Offset(0, 1), blurRadius: 3, color: Colors.black)]),
-                          maxLines: 2, overflow: TextOverflow.ellipsis),
-                      if (body.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(body, style: const TextStyle(fontSize: 11, color: Colors.white70), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Positioned(
+                    bottom: 14, left: 14, right: 14,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white,
+                            shadows: [Shadow(offset: Offset(0, 1), blurRadius: 3, color: Colors.black)]),
+                            maxLines: 2, overflow: TextOverflow.ellipsis),
+                        if (body.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(body, style: const TextStyle(fontSize: 11, color: Colors.white70), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                  Positioned(
+                    top: 10, right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.open_in_full_rounded, size: 11, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(tr('readMore'),
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         if (tags.isNotEmpty)
@@ -1239,6 +1314,261 @@ class _SalonSwitcherSheetState extends State<_SalonSwitcherSheet> {
             ),
         ],
       ),
+    );
+  }
+}
+
+// ───────────────────────────────────────────
+//  Daily tip — full detail bottom sheet
+// ───────────────────────────────────────────
+class _TipDetailSheet extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const _TipDetailSheet({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final title = data['title']?.toString() ?? '';
+    final body = data['body']?.toString() ?? data['content']?.toString() ?? '';
+    final coverUrl = ApiClient.getImageUrl(data['coverImageUrl']?.toString() ?? data['imageUrl']?.toString() ?? '');
+    final author = data['author']?.toString() ?? data['authorName']?.toString() ?? '';
+    final publishedAt = data['publishedAt']?.toString() ?? data['createdAt']?.toString() ?? '';
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: AppTheme.getBgSecondary(context),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(top: BorderSide(color: AppTheme.getBorder(context))),
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.getTextTertiary(context),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: EdgeInsets.zero,
+                  children: [
+                    if (coverUrl.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                        height: 200,
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.network(coverUrl, fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(
+                                color: AppTheme.getBgGlass(context),
+                                child: Icon(Icons.lightbulb_outline, size: 36, color: AppTheme.getTextTertiary(context)))),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.lightbulb_outline, size: 14, color: AppTheme.getGold(context)),
+                              const SizedBox(width: 6),
+                              Text(tr('dailyTip'),
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                                      color: AppTheme.getGold(context), letterSpacing: 0.5)),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(title,
+                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700,
+                                  color: AppTheme.getTextPrimary(context), height: 1.25)),
+                          if (author.isNotEmpty || publishedAt.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              [author, publishedAt].where((s) => s.isNotEmpty).join(' • '),
+                              style: TextStyle(fontSize: 11, color: AppTheme.getTextTertiary(context)),
+                            ),
+                          ],
+                          if (body.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Text(body,
+                                style: TextStyle(fontSize: 14, height: 1.6, color: AppTheme.getTextSecondary(context))),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ───────────────────────────────────────────
+//  Inspiration — full detail bottom sheet
+// ───────────────────────────────────────────
+class _InspirationDetailSheet extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final VoidCallback onStyleTap;
+  const _InspirationDetailSheet({required this.data, required this.onStyleTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final title = data['title']?.toString() ?? '';
+    final body = data['body']?.toString() ?? data['description']?.toString() ?? '';
+    final coverUrl = ApiClient.getImageUrl(data['coverImageUrl']?.toString() ?? data['imageUrl']?.toString() ?? '');
+    final linkedStyles = data['linkedStyles'] as List? ?? data['styles'] as List? ?? [];
+    final tags = data['tags'] as List? ?? [];
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: AppTheme.getBgSecondary(context),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(top: BorderSide(color: AppTheme.getBorder(context))),
+          ),
+          child: Column(
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.getTextTertiary(context),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: EdgeInsets.zero,
+                  children: [
+                    if (coverUrl.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                        height: 240,
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.network(coverUrl, fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(color: AppTheme.getBgGlass(context))),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.auto_awesome, size: 14, color: AppTheme.getGold(context)),
+                              const SizedBox(width: 6),
+                              Text(tr('inspiration'),
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                                      color: AppTheme.getGold(context), letterSpacing: 0.5)),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(title,
+                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700,
+                                  color: AppTheme.getTextPrimary(context), height: 1.25)),
+                          if (body.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            Text(body,
+                                style: TextStyle(fontSize: 14, height: 1.6, color: AppTheme.getTextSecondary(context))),
+                          ],
+                          if (tags.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 8, runSpacing: 8,
+                              children: tags.map((t) => Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.getBgGlass(context),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppTheme.getBorder(context)),
+                                ),
+                                child: Text('#${t.toString()}',
+                                    style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context))),
+                              )).toList(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (linkedStyles.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+                        child: Text(tr('inspiration'),
+                            style: AppTheme.displayFont.copyWith(fontSize: 14, color: AppTheme.getTextPrimary(context))),
+                      ),
+                      SizedBox(
+                        height: 140,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          scrollDirection: Axis.horizontal,
+                          itemCount: linkedStyles.length,
+                          itemBuilder: (context, index) {
+                            final s = linkedStyles[index] as Map<String, dynamic>? ?? {};
+                            final sName = s['name']?.toString() ?? '';
+                            final sImg = ApiClient.getImageUrl(s['imageUrl']?.toString() ?? '');
+                            return GestureDetector(
+                              onTap: onStyleTap,
+                              child: Container(
+                                width: 96, margin: const EdgeInsets.only(right: 12),
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      width: 96, height: 100,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: AppTheme.getBorder(context)),
+                                      ),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: sImg.isNotEmpty
+                                          ? Image.network(sImg, fit: BoxFit.cover,
+                                              errorBuilder: (_, _, _) => Container(color: AppTheme.getBgGlass(context)))
+                                          : Container(color: AppTheme.getBgGlass(context)),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(sName,
+                                        style: TextStyle(fontSize: 11, color: AppTheme.getTextSecondary(context)),
+                                        maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ] else
+                      const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

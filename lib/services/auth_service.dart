@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'api_client.dart';
 import 'storage_service.dart';
 
@@ -28,23 +29,57 @@ class AuthService {
     return result;
   }
 
-  /// Register an admin + salon
+  /// Register an admin + salon. When a [logo] is provided, the request is
+  /// sent as multipart/form-data; otherwise it falls back to JSON.
   Future<Map<String, dynamic>> registerAdmin({
     required String name,
     required String email,
     required String password,
-    required String phone,
     required String salonName,
-    String? salonAddress,
+    String? phone,
+    String? salonLocation,
+    String? salonPhone,
+    String? salonDescription,
+    XFile? logo,
   }) async {
-    final result = await _api.post('/auth/register-admin', auth: false, body: {
-      'name': name,
-      'email': email,
-      'password': password,
-      'phone': phone,
-      'salonName': salonName,
-      if (salonAddress != null) 'salonAddress': salonAddress,
-    });
+    final Map<String, dynamic> result;
+    if (logo != null) {
+      final bytes = await logo.readAsBytes();
+      final fields = <String, String>{
+        'name': name,
+        'email': email,
+        'password': password,
+        'salonName': salonName,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+        if (salonLocation != null && salonLocation.isNotEmpty)
+          'salonLocation': salonLocation,
+        if (salonPhone != null && salonPhone.isNotEmpty) 'salonPhone': salonPhone,
+        if (salonDescription != null && salonDescription.isNotEmpty)
+          'salonDescription': salonDescription,
+      };
+      result = await _api.uploadMultipart(
+        '/auth/register-admin',
+        bytes: bytes,
+        filename: logo.name,
+        fieldName: 'logo',
+        fields: fields,
+        auth: false,
+      );
+    } else {
+      result = await _api.post('/auth/register-admin', auth: false, body: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'salonName': salonName,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+        if (salonLocation != null && salonLocation.isNotEmpty)
+          'salonLocation': salonLocation,
+        if (salonPhone != null && salonPhone.isNotEmpty)
+          'salonPhone': salonPhone,
+        if (salonDescription != null && salonDescription.isNotEmpty)
+          'salonDescription': salonDescription,
+      });
+    }
     await _handleAuthResponse(result, 'admin');
     return result;
   }

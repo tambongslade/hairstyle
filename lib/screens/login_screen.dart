@@ -1,4 +1,6 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_locale.dart';
 import '../main.dart';
@@ -63,13 +65,14 @@ class _LoginScreenState extends State<LoginScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _RegisterSheet(
-        onRegistered: () {
-          // Close the sheet and navigate to home
+        onRegistered: (bool isSalonAccount) {
+          // Close the sheet and navigate to the appropriate shell
           Navigator.of(ctx).pop();
           if (!mounted) return;
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => const MainShell(),
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  isSalonAccount ? const AdminShell() : const MainShell(),
               transitionsBuilder: (_, anim, _, child) =>
                   FadeTransition(opacity: anim, child: child),
               transitionDuration: const Duration(milliseconds: 400),
@@ -375,29 +378,29 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
 
-              if (!_isAdmin) ...[
-                const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-                // Sign up
-                Center(
-                  child: GestureDetector(
-                    onTap: _register,
-                    child: RichText(
-                      text: TextSpan(
-                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                        children: [
-                          TextSpan(text: tr('noAccount')),
-                          TextSpan(
-                            text: tr('signUp'),
-                            style: const TextStyle(
-                                color: AppTheme.teal, fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
+              // Sign up — shown to both customers and salon admins;
+              // the registration sheet itself asks the user which type
+              // of account to create.
+              Center(
+                child: GestureDetector(
+                  onTap: _register,
+                  child: RichText(
+                    text: TextSpan(
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                      children: [
+                        TextSpan(text: tr('noAccount')),
+                        TextSpan(
+                          text: tr('signUp'),
+                          style: const TextStyle(
+                              color: AppTheme.teal, fontWeight: FontWeight.w600),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ],
+              ),
               const SizedBox(height: 30),
             ],
           ),
@@ -463,11 +466,16 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ═══════════════════════════════════════════════════════
-//  Premium Registration Sheet
+//  Premium Registration Sheet (Customer + Salon)
 // ═══════════════════════════════════════════════════════
 
+enum _AccountType { customer, salon }
+
 class _RegisterSheet extends StatefulWidget {
-  final VoidCallback onRegistered;
+  /// Called when registration succeeds. The argument is `true` if a salon
+  /// account was created (caller should route to AdminShell) and `false`
+  /// for a regular customer.
+  final void Function(bool isSalonAccount) onRegistered;
   const _RegisterSheet({required this.onRegistered});
 
   @override
@@ -476,71 +484,188 @@ class _RegisterSheet extends StatefulWidget {
 
 class _RegisterSheetState extends State<_RegisterSheet> {
   final _formKey = GlobalKey<FormState>();
+
+  // Personal info
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+
+  // Salon info
+  final _salonNameCtrl = TextEditingController();
+  final _salonLocationCtrl = TextEditingController();
+  final _salonPhoneCtrl = TextEditingController();
+  final _salonDescCtrl = TextEditingController();
+
+  // Security
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
 
+  final _picker = ImagePicker();
+  XFile? _logoFile;
+  Uint8List? _logoBytes;
+
+  _AccountType? _accountType;
+  int _currentStep = 0; // 0 = chooser, 1 = personal, 2 = salon, 3 = security
   bool _isLoading = false;
   bool _obscurePass = true;
   bool _obscureConfirm = true;
-  int _currentStep = 0; // 0 = info, 1 = security
+
+  // Step order depends on account type.
+  List<int> get _steps => _accountType == _AccountType.salon
+      ? const [0, 1, 2, 3]
+      : const [0, 1, 3];
+
+  bool get _isLastStep => _currentStep == _steps.last;
+
+  String get _ctaLabel {
+    if (_isLastStep) return tr('registerBtn');
+    return tr('continueBtn');
+  }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
+    _salonNameCtrl.dispose();
+    _salonLocationCtrl.dispose();
+    _salonPhoneCtrl.dispose();
+    _salonDescCtrl.dispose();
     _passCtrl.dispose();
     _confirmCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _handleRegister() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _pickLogo() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _logoFile = picked;
+      _logoBytes = bytes;
+    });
+  }
+
+  void _snack(String msg, {Color? color}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: color ?? AppTheme.accentRed,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  bool _validatePersonalStep() {
+    if (_nameCtrl.text.trim().isEmpty ||
+        _emailCtrl.text.trim().isEmpty ||
+        _phoneCtrl.text.trim().isEmpty) {
+      _formKey.currentState!.validate();
+      return false;
+    }
+    if (!_emailCtrl.text.contains('@')) {
+      _formKey.currentState!.validate();
+      return false;
+    }
+    return true;
+  }
+
+  bool _validateSalonStep() {
+    if (_salonNameCtrl.text.trim().isEmpty) {
+      _formKey.currentState!.validate();
+      return false;
+    }
+    return true;
+  }
+
+  bool _validateSecurityStep() {
+    if (_passCtrl.text.isEmpty || _confirmCtrl.text.isEmpty) {
+      _formKey.currentState!.validate();
+      return false;
+    }
+    if (_passCtrl.text.length < 8) {
+      _snack(tr('min8chars'));
+      return false;
+    }
     if (_passCtrl.text != _confirmCtrl.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr('passwordsDoNotMatch')),
-          backgroundColor: AppTheme.accentRed,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      _snack(tr('passwordsDoNotMatch'));
+      return false;
+    }
+    return true;
+  }
+
+  void _goNext() {
+    if (_currentStep == 0) {
+      if (_accountType == null) return;
+      setState(() => _currentStep = 1);
       return;
     }
+    if (_currentStep == 1) {
+      if (!_validatePersonalStep()) return;
+      // For salon, go to salon-info; for customer, jump to security.
+      setState(() =>
+          _currentStep = _accountType == _AccountType.salon ? 2 : 3);
+      return;
+    }
+    if (_currentStep == 2) {
+      if (!_validateSalonStep()) return;
+      setState(() => _currentStep = 3);
+      return;
+    }
+    if (_currentStep == 3) {
+      _submit();
+    }
+  }
+
+  void _goBack() {
+    if (_currentStep == 0) return;
+    if (_currentStep == 3 && _accountType == _AccountType.customer) {
+      setState(() => _currentStep = 1);
+      return;
+    }
+    setState(() => _currentStep = _currentStep - 1);
+  }
+
+  Future<void> _submit() async {
+    if (!_validateSecurityStep()) return;
 
     setState(() => _isLoading = true);
     try {
-      await AuthService.instance.registerCustomer(
-        name: _nameCtrl.text.trim(),
-        email: _emailCtrl.text.trim(),
-        password: _passCtrl.text,
-        phone: _phoneCtrl.text.trim(),
-      );
+      if (_accountType == _AccountType.salon) {
+        await AuthService.instance.registerAdmin(
+          name: _nameCtrl.text.trim(),
+          email: _emailCtrl.text.trim(),
+          password: _passCtrl.text,
+          phone: _phoneCtrl.text.trim(),
+          salonName: _salonNameCtrl.text.trim(),
+          salonLocation: _salonLocationCtrl.text.trim(),
+          salonPhone: _salonPhoneCtrl.text.trim(),
+          salonDescription: _salonDescCtrl.text.trim(),
+          logo: _logoFile,
+        );
+      } else {
+        await AuthService.instance.registerCustomer(
+          name: _nameCtrl.text.trim(),
+          email: _emailCtrl.text.trim(),
+          password: _passCtrl.text,
+          phone: _phoneCtrl.text.trim(),
+        );
+      }
       if (!mounted) return;
-      widget.onRegistered();
+      widget.onRegistered(_accountType == _AccountType.salon);
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: AppTheme.accentRed,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      _snack(e.message);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(tr('registerFailed')),
-          backgroundColor: AppTheme.accentRed,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      _snack(tr('registerFailed'));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -564,7 +689,6 @@ class _RegisterSheetState extends State<_RegisterSheet> {
             key: _formKey,
             child: Column(
               children: [
-                // Drag handle
                 Padding(
                   padding: const EdgeInsets.only(top: 12, bottom: 4),
                   child: Container(
@@ -576,28 +700,33 @@ class _RegisterSheetState extends State<_RegisterSheet> {
                   ),
                 ),
 
-                // Header
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tr('registerTitle'),
-                            style: AppTheme.displayFont.copyWith(
-                              fontSize: 24,
-                              color: Colors.black87,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _currentStep == 0
+                                  ? tr('chooseAccountType')
+                                  : tr('registerTitle'),
+                              style: AppTheme.displayFont.copyWith(
+                                fontSize: 24,
+                                color: Colors.black87,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            tr('signInSub'),
-                            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Text(
+                              _currentStep == 0
+                                  ? tr('chooseAccountTypeSub')
+                                  : tr('signInSub'),
+                              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                            ),
+                          ],
+                        ),
                       ),
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
@@ -616,68 +745,35 @@ class _RegisterSheetState extends State<_RegisterSheet> {
 
                 const SizedBox(height: 20),
 
-                // Step indicator
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    children: [
-                      _buildStepDot(0, tr('personalInfo')),
-                      Expanded(
-                        child: Container(
-                          height: 2,
-                          margin: const EdgeInsets.symmetric(horizontal: 8),
-                          color: _currentStep >= 1 ? AppTheme.teal : Colors.grey.shade200,
-                        ),
-                      ),
-                      _buildStepDot(1, tr('security')),
-                    ],
+                if (_currentStep > 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: _buildStepIndicator(),
                   ),
-                ),
 
-                const SizedBox(height: 24),
+                if (_currentStep > 0) const SizedBox(height: 24),
 
-                // Form fields
                 Expanded(
                   child: ListView(
                     controller: scrollController,
                     padding: EdgeInsets.fromLTRB(24, 0, 24, bottomInset + 24),
                     children: [
-                      AnimatedCrossFade(
-                        firstChild: _buildStep1(),
-                        secondChild: _buildStep2(),
-                        crossFadeState: _currentStep == 0
-                            ? CrossFadeState.showFirst
-                            : CrossFadeState.showSecond,
-                        duration: const Duration(milliseconds: 300),
-                      ),
+                      _buildStepContent(),
 
                       const SizedBox(height: 28),
 
-                      // Action button
                       GestureDetector(
-                        onTap: _isLoading
+                        onTap: _isLoading || (_currentStep == 0 && _accountType == null)
                             ? null
-                            : () {
-                                if (_currentStep == 0) {
-                                  // Validate step 1 fields
-                                  if (_nameCtrl.text.trim().isEmpty ||
-                                      _emailCtrl.text.trim().isEmpty ||
-                                      _phoneCtrl.text.trim().isEmpty) {
-                                    _formKey.currentState!.validate();
-                                    return;
-                                  }
-                                  setState(() => _currentStep = 1);
-                                } else {
-                                  _handleRegister();
-                                }
-                              },
+                            : _goNext,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
                           width: double.infinity,
                           height: 54,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: _isLoading
+                              colors: (_isLoading ||
+                                      (_currentStep == 0 && _accountType == null))
                                   ? [Colors.grey.shade400, Colors.grey.shade400]
                                   : [AppTheme.navy, AppTheme.navyLight],
                             ),
@@ -702,7 +798,7 @@ class _RegisterSheetState extends State<_RegisterSheet> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        _currentStep == 0 ? tr('continueBtn') : tr('registerBtn'),
+                                        _ctaLabel,
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.w700,
@@ -710,7 +806,7 @@ class _RegisterSheetState extends State<_RegisterSheet> {
                                           letterSpacing: 0.3,
                                         ),
                                       ),
-                                      if (_currentStep == 0) ...[
+                                      if (!_isLastStep) ...[
                                         const SizedBox(width: 8),
                                         const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
                                       ],
@@ -720,12 +816,11 @@ class _RegisterSheetState extends State<_RegisterSheet> {
                         ),
                       ),
 
-                      // Back to step 1
-                      if (_currentStep == 1) ...[
+                      if (_currentStep > 0) ...[
                         const SizedBox(height: 14),
                         Center(
                           child: GestureDetector(
-                            onTap: () => setState(() => _currentStep = 0),
+                            onTap: _isLoading ? null : _goBack,
                             child: Text(
                               tr('back'),
                               style: TextStyle(
@@ -740,7 +835,6 @@ class _RegisterSheetState extends State<_RegisterSheet> {
 
                       const SizedBox(height: 20),
 
-                      // Terms text
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -766,11 +860,77 @@ class _RegisterSheetState extends State<_RegisterSheet> {
     );
   }
 
-  Widget _buildStep1() {
+  Widget _buildStepContent() {
+    switch (_currentStep) {
+      case 0:
+        return _buildChooserStep();
+      case 1:
+        return _buildPersonalStep();
+      case 2:
+        return _buildSalonStep();
+      case 3:
+        return _buildSecurityStep();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildStepIndicator() {
+    // Build a labelled dot for each visible step (after the chooser).
+    final entries = <_StepInfo>[
+      _StepInfo(1, tr('personalInfo')),
+      if (_accountType == _AccountType.salon)
+        _StepInfo(2, tr('salonInfo')),
+      _StepInfo(3, tr('security')),
+    ];
+
+    final widgets = <Widget>[];
+    for (var i = 0; i < entries.length; i++) {
+      final e = entries[i];
+      widgets.add(_buildStepDot(e.step, e.label));
+      if (i < entries.length - 1) {
+        widgets.add(
+          Expanded(
+            child: Container(
+              height: 2,
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              color: _currentStep > e.step ? AppTheme.teal : Colors.grey.shade200,
+            ),
+          ),
+        );
+      }
+    }
+    return Row(children: widgets);
+  }
+
+  Widget _buildChooserStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        _AccountTypeCard(
+          icon: Icons.person_outline_rounded,
+          title: tr('customerAccount'),
+          subtitle: tr('customerAccountSub'),
+          selected: _accountType == _AccountType.customer,
+          onTap: () => setState(() => _accountType = _AccountType.customer),
+        ),
+        const SizedBox(height: 14),
+        _AccountTypeCard(
+          icon: Icons.storefront_outlined,
+          title: tr('salonAccount'),
+          subtitle: tr('salonAccountSub'),
+          selected: _accountType == _AccountType.salon,
+          onTap: () => setState(() => _accountType = _AccountType.salon),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPersonalStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Avatar placeholder
         Center(
           child: Container(
             width: 80, height: 80,
@@ -819,11 +979,114 @@ class _RegisterSheetState extends State<_RegisterSheet> {
     );
   }
 
-  Widget _buildStep2() {
+  Widget _buildSalonStep() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Lock icon
+        Center(child: _buildLogoPicker()),
+        const SizedBox(height: 24),
+
+        _buildFieldLabel(tr('salonName')),
+        const SizedBox(height: 8),
+        _buildField(
+          controller: _salonNameCtrl,
+          hint: 'LIS Beauty',
+          icon: Icons.storefront_outlined,
+          textCapitalization: TextCapitalization.words,
+        ),
+        const SizedBox(height: 18),
+
+        _buildFieldLabel('${tr('salonLocation')}  ·  ${tr('optional')}'),
+        const SizedBox(height: 8),
+        _buildField(
+          controller: _salonLocationCtrl,
+          hint: 'Douala, Akwa',
+          icon: Icons.place_outlined,
+          optional: true,
+        ),
+        const SizedBox(height: 18),
+
+        _buildFieldLabel('${tr('salonPhone')}  ·  ${tr('optional')}'),
+        const SizedBox(height: 8),
+        _buildField(
+          controller: _salonPhoneCtrl,
+          hint: '+237 6XX XXX XXX',
+          icon: Icons.phone_outlined,
+          keyboardType: TextInputType.phone,
+          optional: true,
+        ),
+        const SizedBox(height: 18),
+
+        _buildFieldLabel('${tr('salonDescription')}  ·  ${tr('optional')}'),
+        const SizedBox(height: 8),
+        _buildField(
+          controller: _salonDescCtrl,
+          hint: tr('salonDescriptionOptional'),
+          icon: Icons.description_outlined,
+          optional: true,
+          maxLines: 3,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogoPicker() {
+    return GestureDetector(
+      onTap: _pickLogo,
+      child: Container(
+        width: 110, height: 110,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _logoBytes != null
+                ? AppTheme.teal.withValues(alpha: 0.5)
+                : Colors.grey.shade300,
+            width: 2,
+          ),
+        ),
+        child: ClipOval(
+          child: _logoBytes != null
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.memory(_logoBytes!, fit: BoxFit.cover),
+                    Positioned(
+                      right: 4, bottom: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.navy,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: const Icon(Icons.edit, size: 12, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_a_photo_outlined,
+                        size: 30, color: Colors.grey.shade400),
+                    const SizedBox(height: 6),
+                    Text(
+                      tr('tapToAddLogo'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecurityStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Center(
           child: Container(
             width: 80, height: 80,
@@ -871,7 +1134,6 @@ class _RegisterSheetState extends State<_RegisterSheet> {
 
         const SizedBox(height: 16),
 
-        // Password strength hints
         _buildPasswordHint(tr('min8chars'), _passCtrl.text.length >= 8),
         _buildPasswordHint(tr('passwordsMatch'),
             _passCtrl.text.isNotEmpty && _passCtrl.text == _confirmCtrl.text),
@@ -881,6 +1143,7 @@ class _RegisterSheetState extends State<_RegisterSheet> {
 
   Widget _buildStepDot(int step, String label) {
     final isActive = _currentStep >= step;
+    final isDone = _currentStep > step;
     return Column(
       children: [
         AnimatedContainer(
@@ -897,11 +1160,12 @@ class _RegisterSheetState extends State<_RegisterSheet> {
           child: Center(
             child: isActive
                 ? Icon(
-                    step < _currentStep ? Icons.check_rounded : Icons.circle,
-                    size: step < _currentStep ? 16 : 8,
+                    isDone ? Icons.check_rounded : Icons.circle,
+                    size: isDone ? 16 : 8,
                     color: Colors.white,
                   )
-                : Text('${step + 1}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade400)),
+                : Text('$step', style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade400)),
           ),
         ),
         const SizedBox(height: 4),
@@ -927,6 +1191,8 @@ class _RegisterSheetState extends State<_RegisterSheet> {
     bool isEmail = false,
     bool isPassword = false,
     bool obscure = false,
+    bool optional = false,
+    int maxLines = 1,
     VoidCallback? onToggleObscure,
     TextInputType keyboardType = TextInputType.text,
     TextCapitalization textCapitalization = TextCapitalization.none,
@@ -942,9 +1208,11 @@ class _RegisterSheetState extends State<_RegisterSheet> {
         obscureText: isPassword && obscure,
         keyboardType: keyboardType,
         textCapitalization: textCapitalization,
+        maxLines: isPassword ? 1 : maxLines,
         onChanged: isPassword ? (_) => setState(() {}) : null,
         style: const TextStyle(color: Colors.black87, fontSize: 15),
         validator: (v) {
+          if (optional) return null;
           if (v == null || v.trim().isEmpty) return tr('fieldRequired');
           if (isEmail && !v.contains('@')) return tr('invalidEmail');
           return null;
@@ -989,6 +1257,98 @@ class _RegisterSheetState extends State<_RegisterSheet> {
             color: satisfied ? AppTheme.accentGreen : Colors.grey.shade400,
           )),
         ],
+      ),
+    );
+  }
+}
+
+class _StepInfo {
+  final int step;
+  final String label;
+  const _StepInfo(this.step, this.label);
+}
+
+class _AccountTypeCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _AccountTypeCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.teal.withValues(alpha: 0.08) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? AppTheme.teal : Colors.grey.shade200,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                color: selected ? AppTheme.teal : Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected ? AppTheme.teal : Colors.grey.shade200,
+                ),
+              ),
+              child: Icon(icon, color: selected ? Colors.white : AppTheme.navy, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 22, height: 22,
+              decoration: BoxDecoration(
+                color: selected ? AppTheme.teal : Colors.transparent,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected ? AppTheme.teal : Colors.grey.shade300,
+                  width: 2,
+                ),
+              ),
+              child: selected
+                  ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                  : null,
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -22,7 +22,7 @@ class ApiClient {
 
   /// Public origin of the customer-facing web app. Used to build the
   /// salon-catalogue share link the salon sends to its clients.
-  static const String webBaseUrl = 'https://lisbeauty.evols.online';
+  static const String webBaseUrl = 'https://beauty.mylisapp.online';
 
   /// Returns the public share link for [salonId] — what a salon owner sends
   /// to a client so they can browse, book, and run AI try-ons as a guest.

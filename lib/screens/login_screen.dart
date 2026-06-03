@@ -449,14 +449,39 @@ class _RegisterSheetState extends State<_RegisterSheet> {
   }
 
   void _snack(String msg, {Color? color}) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(msg),
         backgroundColor: color ?? AppTheme.accentRed,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        // Give the user time to actually read an error, and a way to dismiss it.
+        duration: const Duration(seconds: 8),
+        showCloseIcon: true,
       ),
     );
+  }
+
+  /// Turn any thrown error into a human-readable message, surfacing backend
+  /// validation details (NestJS often returns them as a list or an `errors`
+  /// map) instead of swallowing them.
+  String _describeError(Object e) {
+    if (e is ApiException) {
+      final parts = <String>[];
+      if (e.message.trim().isNotEmpty) parts.add(e.message.trim());
+      final errs = e.errors;
+      if (errs != null && errs.isNotEmpty) {
+        errs.forEach((k, v) {
+          final val = v is List ? v.join(', ') : '$v';
+          parts.add('$k: $val');
+        });
+      }
+      final joined = parts.join(' — ');
+      return joined.isEmpty ? 'Error ${e.statusCode}' : joined;
+    }
+    return e.toString();
   }
 
   bool _validatePersonalStep() {
@@ -522,8 +547,11 @@ class _RegisterSheetState extends State<_RegisterSheet> {
     if (!_validateSecurityStep()) return;
 
     setState(() => _isLoading = true);
+    debugPrint('[SalonSignup] POST register-admin '
+        'email="${_emailCtrl.text.trim()}" salon="${_salonNameCtrl.text.trim()}" '
+        'hasLogo=${_logoFile != null}');
     try {
-      await AuthService.instance.registerAdmin(
+      final res = await AuthService.instance.registerAdmin(
         name: _nameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         password: _passCtrl.text,
@@ -534,14 +562,27 @@ class _RegisterSheetState extends State<_RegisterSheet> {
         salonDescription: _salonDescCtrl.text.trim(),
         logo: _logoFile,
       );
+      debugPrint('[SalonSignup] response keys=${res.keys.toList()} '
+          'isLoggedIn=${AuthService.instance.isLoggedIn}');
       if (!mounted) return;
+      // The request can return 2xx but without a token (e.g. email already
+      // exists handled as a soft response). Don't silently "succeed".
+      if (!AuthService.instance.isLoggedIn) {
+        _snack(tr('registerNoSession'));
+        return;
+      }
       widget.onRegistered();
-    } on ApiException catch (e) {
+    } on ApiException catch (e, st) {
+      debugPrint('[SalonSignup] API ERROR status=${e.statusCode} '
+          'message="${e.message}" errors=${e.errors}');
+      debugPrintStack(stackTrace: st, label: '[SalonSignup]');
       if (!mounted) return;
-      _snack(e.message);
-    } catch (_) {
+      _snack(_describeError(e));
+    } catch (e, st) {
+      debugPrint('[SalonSignup] ERROR: $e');
+      debugPrintStack(stackTrace: st, label: '[SalonSignup]');
       if (!mounted) return;
-      _snack(tr('registerFailed'));
+      _snack(_describeError(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

@@ -6,7 +6,8 @@ import '../../services/public_service.dart';
 import '../../services/storage_service.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/gold_button.dart';
-import 'guest_loyalty_screen.dart';
+import 'client_fidelity_screen.dart';
+import 'salon_auth_screen.dart';
 
 /// Salon catalogue (guest-facing). Single salon, no auth — everything is
 /// fetched from /public/salons/:salonId/catalogue.
@@ -253,7 +254,46 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
               ],
             ),
           ),
+          const SizedBox(width: 10),
+          _accountButton(),
         ],
+      ),
+    );
+  }
+
+  /// Top-right affordance: a "Sign in" pill when logged out, a person icon
+  /// (→ fidelity page) when a customer is signed in.
+  Widget _accountButton() {
+    if (_isClientLoggedIn) {
+      return GestureDetector(
+        onTap: _openLoyalty,
+        child: Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: AppTheme.getGold(context).withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(Icons.person_rounded,
+              color: AppTheme.getGold(context), size: 20),
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: () => _openAuth(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppTheme.getGold(context),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          tr('signIn'),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }
@@ -289,14 +329,40 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
     );
   }
 
+  /// True when a customer is signed in (has a token under this salon).
+  bool get _isClientLoggedIn =>
+      StorageService.instance.isLoggedIn && StorageService.instance.isCustomer;
+
+  /// Loyalty entry point: signed-in customers see their fidelity page;
+  /// everyone else gets the sign-in / sign-up screen first.
+  Future<void> _openLoyalty() async {
+    if (_isClientLoggedIn) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const ClientFidelityScreen()),
+      );
+    } else {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SalonAuthScreen()),
+      );
+    }
+    // Auth state may have changed — refresh the header/account affordances.
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openAuth({bool signup = false}) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => SalonAuthScreen(startOnSignup: signup)),
+    );
+    if (mounted) setState(() {});
+  }
+
   Widget _buildMyPointsRow() {
+    final loggedIn = _isClientLoggedIn;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const GuestLoyaltyScreen()),
-        ),
+        onTap: _openLoyalty,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
@@ -321,7 +387,7 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'My points',
+                      loggedIn ? tr('myRewards') : tr('joinRewards'),
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -330,7 +396,9 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Track your tier, rewards, and visits.',
+                      loggedIn
+                          ? tr('trackTierRewards')
+                          : tr('signInToEarn'),
                       style: TextStyle(
                         fontSize: 11,
                         color: AppTheme.getTextSecondary(context),

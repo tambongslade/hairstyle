@@ -649,6 +649,22 @@ class Translations {
     'savingStyle': 'Saving...',
     'styleUpdated': 'Style updated successfully!',
     'styleUpdateError': 'Failed to update style',
+
+    // ─── Client auth & fidelity (salon-scoped) ───
+    'thisSalon': 'this salon',
+    'noSalonSelectedShort': 'No salon selected.',
+    'joinRewards': 'Join rewards',
+    'myRewards': 'My rewards',
+    'welcomeBackClient': 'Welcome back',
+    'joinRewardsSub': 'Create an account to start earning points at {salon}.',
+    'signInClientSub': 'Sign in to see your points and rewards at {salon}.',
+    'createAccount': 'Create account',
+    'checkPointsByPhone': 'Just check my points by phone',
+    'continueAsGuest': 'Continue as guest',
+    'passwordTooShort': 'At least 6 characters',
+    'trackTierRewards': 'Track your tier, rewards, and visits.',
+    'signInToEarn': 'Sign in or sign up to earn points.',
+    'signOutConfirm': 'Sign out of your account at this salon?',
   };
 
   static const _fr = {
@@ -1296,5 +1312,21 @@ class Translations {
     'savingStyle': 'Enregistrement...',
     'styleUpdated': 'Style mis à jour avec succès !',
     'styleUpdateError': 'Échec de la mise à jour du style',
+
+    // ─── Authentification client & fidélité (par salon) ───
+    'thisSalon': 'ce salon',
+    'noSalonSelectedShort': 'Aucun salon sélectionné.',
+    'joinRewards': 'Programme fidélité',
+    'myRewards': 'Mes récompenses',
+    'welcomeBackClient': 'Bon retour',
+    'joinRewardsSub': 'Créez un compte pour gagner des points chez {salon}.',
+    'signInClientSub': 'Connectez-vous pour voir vos points et récompenses chez {salon}.',
+    'createAccount': 'Créer un compte',
+    'checkPointsByPhone': 'Vérifier mes points par téléphone',
+    'continueAsGuest': 'Continuer en invité',
+    'passwordTooShort': 'Au moins 6 caractères',
+    'trackTierRewards': 'Suivez votre niveau, récompenses et visites.',
+    'signInToEarn': 'Connectez-vous ou inscrivez-vous pour gagner des points.',
+    'signOutConfirm': 'Se déconnecter de votre compte dans ce salon ?',
   };
 }

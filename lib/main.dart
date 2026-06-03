@@ -12,6 +12,7 @@ import 'screens/profile_screen.dart';
 import 'screens/language_screen.dart';
 import 'widgets/liquid_glass_navbar.dart';
 import 'screens/login_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/admin/admin_shell.dart';
 import 'screens/guest/guest_shell.dart';
 import 'services/storage_service.dart';
@@ -42,6 +43,12 @@ GoRouter buildRouter() {
       GoRoute(
         path: '/',
         builder: (context, state) => const _RootGate(),
+      ),
+      // First-run onboarding carousel. Reached from the language screen and,
+      // on completion, routes back to the root gate.
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
       ),
       // Guest entry — salon shares this link with a client.
       GoRoute(

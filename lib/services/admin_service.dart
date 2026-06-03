@@ -121,6 +121,23 @@ class AdminService {
   Future<Map<String, dynamic>> deleteStyle(String id) =>
       _api.delete('/admin/catalog/styles/$id');
 
+  // ── Catalog categories (per-salon, custom) ──
+  // Salon is taken from the JWT — the frontend never sends salonId.
+  Future<Map<String, dynamic>> getCatalogCategories() =>
+      _api.get('/admin/catalog/categories');
+
+  Future<Map<String, dynamic>> getCatalogCategory(String id) =>
+      _api.get('/admin/catalog/categories/$id');
+
+  Future<Map<String, dynamic>> createCatalogCategory(Map<String, dynamic> data) =>
+      _api.post('/admin/catalog/categories', body: data);
+
+  Future<Map<String, dynamic>> updateCatalogCategory(String id, Map<String, dynamic> data) =>
+      _api.put('/admin/catalog/categories/$id', body: data);
+
+  Future<Map<String, dynamic>> deleteCatalogCategory(String id) =>
+      _api.delete('/admin/catalog/categories/$id');
+
   // ── Time Slots ──
   Future<Map<String, dynamic>> getTimeSlots({Map<String, String>? query}) =>
       _api.get('/admin/time-slots', queryParams: query);

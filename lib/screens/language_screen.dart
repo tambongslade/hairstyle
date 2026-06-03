@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_locale.dart';
 import '../services/storage_service.dart';
-import 'onboarding_screen.dart';
 
 class LanguageScreen extends StatefulWidget {
   const LanguageScreen({super.key});
@@ -36,18 +36,10 @@ class _LanguageScreenState extends State<LanguageScreen>
   Future<void> _continue() async {
     AppLocale.instance.setLanguage(_selected);
     await StorageService.instance.saveLanguage(_selected);
-    await StorageService.instance.setOnboardingComplete();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const OnboardingScreen(),
-        transitionsBuilder: (_, anim, _, child) {
-          return FadeTransition(opacity: anim, child: child);
-        },
-        transitionDuration: const Duration(milliseconds: 500),
-      ),
-    );
+    // Onboarding marks itself complete when finished/skipped, then returns to
+    // the root gate. Drive this through GoRouter so navigation stays in sync.
+    context.go('/onboarding');
   }
 
   @override

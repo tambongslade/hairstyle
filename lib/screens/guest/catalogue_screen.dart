@@ -26,6 +26,8 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   List<Map<String, dynamic>> _styles = [];
   List<Map<String, dynamic>> _services = [];
   List<Map<String, dynamic>> _stylists = [];
+  List<Map<String, dynamic>> _categories = [];
+  String? _selectedCategoryId; // null = All
 
   @override
   void initState() {
@@ -34,6 +36,24 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
   }
 
   String? get _salonId => StorageService.instance.selectedSalonId;
+
+  /// The category id a style belongs to, reading either the flat `categoryId`
+  /// or the nested `customCategory` object the API may return.
+  String? _styleCategoryId(Map<String, dynamic> s) {
+    final flat = s['categoryId']?.toString();
+    if (flat != null && flat.isNotEmpty) return flat;
+    final custom = s['customCategory'];
+    if (custom is Map) return custom['id']?.toString();
+    return null;
+  }
+
+  /// Styles after applying the selected category chip (client-side).
+  List<Map<String, dynamic>> get _filteredStyles {
+    if (_selectedCategoryId == null) return _styles;
+    return _styles
+        .where((s) => _styleCategoryId(s) == _selectedCategoryId)
+        .toList();
+  }
 
   Future<void> _load() async {
     final id = _salonId;
@@ -56,6 +76,20 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
       final services = (data['services'] ?? []) as List;
       final stylists = (data['stylists'] ?? []) as List;
 
+      // Category chips are a nice-to-have — a failure here must not break the
+      // catalogue, so it's fetched best-effort.
+      List<Map<String, dynamic>> categories = [];
+      try {
+        final catRes = await PublicService.instance.getSalonCategories(id);
+        final catRaw =
+            catRes['data'] ?? catRes['items'] ?? catRes['categories'] ?? catRes;
+        if (catRaw is List) {
+          categories = List<Map<String, dynamic>>.from(catRaw.whereType<Map>());
+        }
+      } catch (e) {
+        debugPrint('[Catalogue] categories unavailable: $e');
+      }
+
       // Persist the salon name/logo so the rest of the shell can show them.
       await StorageService.instance.saveSelectedSalon(
         id: salon['id']?.toString() ?? id,
@@ -71,6 +105,12 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
             List<Map<String, dynamic>>.from(services.whereType<Map>());
         _stylists =
             List<Map<String, dynamic>>.from(stylists.whereType<Map>());
+        _categories = categories;
+        // Drop a stale selection if that category no longer exists.
+        if (_selectedCategoryId != null &&
+            !categories.any((c) => c['id']?.toString() == _selectedCategoryId)) {
+          _selectedCategoryId = null;
+        }
         _loading = false;
       });
     } catch (e) {
@@ -310,7 +350,59 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
     );
   }
 
+  Widget _buildCategoryChips() {
+    // "All" + one chip per salon category.
+    final chips = <(String?, String)>[
+      (null, tr('all')),
+      ..._categories
+          .map((c) => (c['id']?.toString(), c['name']?.toString() ?? '')),
+    ];
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: chips.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final id = chips[i].$1;
+          final label = chips[i].$2;
+          final isSelected = _selectedCategoryId == id;
+          return GestureDetector(
+            onTap: () => setState(() => _selectedCategoryId = id),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppTheme.getGold(context)
+                    : AppTheme.getBgGlass(context),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSelected
+                      ? AppTheme.getGold(context)
+                      : AppTheme.getBorder(context),
+                ),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: isSelected
+                      ? Colors.white
+                      : AppTheme.getTextSecondary(context),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildStylesGrid() {
+    final styles = _filteredStyles;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -322,7 +414,23 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                 color: AppTheme.getTextPrimary(context),
               )),
         ),
+        if (_categories.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _buildCategoryChips(),
+        ],
         const SizedBox(height: 12),
+        if (styles.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+            child: Center(
+              child: Text(
+                tr('noStylesYet'),
+                style: TextStyle(
+                    fontSize: 13, color: AppTheme.getTextSecondary(context)),
+              ),
+            ),
+          )
+        else
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: GridView.builder(
@@ -334,9 +442,9 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
               crossAxisSpacing: 12,
               childAspectRatio: 0.62,
             ),
-            itemCount: _styles.length,
+            itemCount: styles.length,
             itemBuilder: (context, i) {
-              final s = _styles[i];
+              final s = styles[i];
               final img =
                   ApiClient.getImageUrl(s['imageUrl']?.toString() ?? '');
               return Container(
@@ -374,12 +482,37 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 2),
-                          Text('${s["price"] ?? "0"} ${tr("fcfa")}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: AppTheme.getGold(context),
-                              )),
+                          // Price is optional — only show it when set.
+                          if (s['price'] != null)
+                            Text('${s["price"]} ${tr("fcfa")}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppTheme.getGold(context),
+                                )),
+                          if (s['longevity'] != null &&
+                              s['longevity'].toString().isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.schedule,
+                                      size: 10,
+                                      color: AppTheme.getTextTertiary(context)),
+                                  const SizedBox(width: 3),
+                                  Expanded(
+                                    child: Text(s['longevity'].toString(),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color:
+                                              AppTheme.getTextTertiary(context),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                     ),

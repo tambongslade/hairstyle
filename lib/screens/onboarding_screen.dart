@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_locale.dart';
+import '../services/storage_service.dart';
 import '../widgets/cached_image.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -48,7 +49,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
-  void _goToLogin() {
+  Future<void> _goToLogin() async {
+    // Remember we've finished onboarding so the root gate doesn't send the
+    // user back here on the next launch.
+    await StorageService.instance.setOnboardingComplete();
+    if (!mounted) return;
     // Salon-first: land on the root gate. From there, an admin goes to
     // AdminShell and everyone else sees the guest landing.
     context.go('/');

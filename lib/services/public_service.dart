@@ -14,6 +14,12 @@ class PublicService {
   Future<Map<String, dynamic>> getCatalogue(String salonId) =>
       _api.get('/public/salons/$salonId/catalogue', auth: false);
 
+  /// A salon's custom style categories (active only), sorted by sortOrder.
+  /// Used to render category filter chips in the guest catalogue.
+  Future<Map<String, dynamic>> getSalonCategories(String salonId) =>
+      _api.get('/styles/salon-categories',
+          auth: false, queryParams: {'salonId': salonId});
+
   Future<Map<String, dynamic>> getAvailableDates(String salonId, {int days = 14}) =>
       _api.get('/public/salons/$salonId/available-dates',
           auth: false, queryParams: {'days': days.toString()});

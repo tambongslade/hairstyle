@@ -151,6 +151,30 @@ class _AdminCatalogState extends State<AdminCatalog> {
     );
   }
 
+  Future<void> _showEditStyleDialog(Map<String, dynamic> style) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _CreateStyleSheet(
+        onCreated: () => _fetchData(),
+        existing: style,
+      ),
+    );
+  }
+
+  Future<void> _showManageCategories() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const _ManageCategoriesSheet(),
+    );
+    // Categories may have changed (e.g. deleted → styles uncategorized);
+    // refresh the grid so category labels stay in sync.
+    if (mounted) _fetchData();
+  }
+
   Future<void> _deleteStyle(String id) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -268,16 +292,34 @@ class _AdminCatalogState extends State<AdminCatalog> {
                       style: TextStyle(fontSize: 12, color: AppTheme.getTextSecondary(context))),
                 ],
               ),
-              GestureDetector(
-                onTap: _showCreateStyleDialog,
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.getGold(context),
-                    borderRadius: BorderRadius.circular(12),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: _showManageCategories,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.getBgSecondary(context),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.getBorder(context)),
+                      ),
+                      child: Icon(Icons.folder_outlined,
+                          color: AppTheme.getTextSecondary(context), size: 20),
+                    ),
                   ),
-                  child: const Icon(Icons.add_photo_alternate_outlined, color: Colors.white, size: 20),
-                ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _showCreateStyleDialog,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.getGold(context),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.add_photo_alternate_outlined, color: Colors.white, size: 20),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -471,17 +513,30 @@ class _AdminCatalogState extends State<AdminCatalog> {
           final style = styles[index];
           final id = '${style['id'] ?? style['_id'] ?? ''}';
           final name = style['name'] ?? '';
-          final price = '${style['price'] ?? 0}';
           final gender = '${style['gender'] ?? 'women'}';
-          final category = '${style['category'] ?? ''}';
+          final legacyCategory = '${style['category'] ?? ''}';
+          final customCat = style['customCategory'];
+          final customCatName =
+              customCat is Map ? customCat['name']?.toString() : null;
           final subcategory = style['subcategory']?.toString();
+          // Prefer the salon's custom category name; fall back to the legacy enum.
+          final categoryLabel = (customCatName != null && customCatName.isNotEmpty)
+              ? customCatName
+              : (subcategory != null && subcategory.isNotEmpty
+                  ? '$legacyCategory / $subcategory'
+                  : legacyCategory);
+          final longevity = style['longevity']?.toString();
           final imageUrl = ApiClient.getImageUrl(style['imageUrl']?.toString() ?? style['image']?.toString());
           final tryOns = style['tryOns'] ?? 0;
           final isFeatured = style['isFeatured'] == true;
+          // Price is optional now — only render an amount when present.
+          final rawPrice = style['price'];
           final priceMax = style['priceMax'];
-          final priceDisplay = (priceMax != null && priceMax != style['price'])
-              ? '$price - $priceMax ${tr("fcfa")}'
-              : '$price ${tr("fcfa")}';
+          final priceDisplay = rawPrice == null
+              ? '—'
+              : (priceMax != null && priceMax != rawPrice)
+                  ? '$rawPrice - $priceMax ${tr("fcfa")}'
+                  : '$rawPrice ${tr("fcfa")}';
           final badgeColor = switch (gender) {
             'women' => const Color(0xFFE091B0),
             'men' => AppTheme.accentBlue,
@@ -584,12 +639,28 @@ class _AdminCatalogState extends State<AdminCatalog> {
                             overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 2),
                         Text(
-                            subcategory != null && subcategory.isNotEmpty
-                                ? '$category / $subcategory'
-                                : category,
+                            categoryLabel,
                             style: TextStyle(fontSize: 10, color: AppTheme.getTextSecondary(context)),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
+                        if (longevity != null && longevity.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(Icons.schedule,
+                                  size: 10, color: AppTheme.getTextTertiary(context)),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: Text(longevity,
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        color: AppTheme.getTextTertiary(context)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
+                        ],
                         const Spacer(),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -599,12 +670,17 @@ class _AdminCatalogState extends State<AdminCatalog> {
                                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.getGold(context)),
                                   overflow: TextOverflow.ellipsis),
                             ),
-                            if (id.isNotEmpty)
+                            if (id.isNotEmpty) ...[
+                              GestureDetector(
+                                onTap: () => _showEditStyleDialog(style),
+                                child: Icon(Icons.edit_outlined, size: 16, color: AppTheme.getTextSecondary(context)),
+                              ),
+                              const SizedBox(width: 10),
                               GestureDetector(
                                 onTap: () => _deleteStyle(id),
                                 child: Icon(Icons.delete_outline, size: 16, color: AppTheme.accentRed),
-                              )
-                            else
+                              ),
+                            ] else
                               Icon(Icons.more_horiz, size: 16, color: AppTheme.getTextTertiary(context)),
                           ],
                         ),
@@ -629,7 +705,10 @@ class _AdminCatalogState extends State<AdminCatalog> {
 class _CreateStyleSheet extends StatefulWidget {
   final VoidCallback onCreated;
 
-  const _CreateStyleSheet({required this.onCreated});
+  /// When non-null the sheet runs in edit mode, prefilled from this style.
+  final Map<String, dynamic>? existing;
+
+  const _CreateStyleSheet({required this.onCreated, this.existing});
 
   @override
   State<_CreateStyleSheet> createState() => _CreateStyleSheetState();
@@ -644,14 +723,78 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
   final _subcategoryController = TextEditingController();
   final _tagsController = TextEditingController();
   final _priceMaxController = TextEditingController();
+  final _longevityController = TextEditingController();
+  final _durationController = TextEditingController();
   bool _isFeatured = false;
   bool _isActive = true;
+
+  // Salon's custom categories (loaded from the API).
+  List<Map<String, dynamic>> _customCategories = [];
+  String? _selectedCustomCategoryId; // null = uncategorized
+  bool _loadingCategories = true;
 
   XFile? _imageFile;
   Uint8List? _imageBytes;
   String _selectedGender = 'women';
   String _selectedCategory = 'braids';
   bool _isSaving = false;
+
+  // Edit mode: the existing image (relative URL) shown until a new one is picked.
+  String? _existingImageUrl;
+  bool get _isEdit => widget.existing != null;
+  String get _editId => widget.existing?['id']?.toString() ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    _prefillFromExisting();
+    _loadCategories();
+  }
+
+  void _prefillFromExisting() {
+    final s = widget.existing;
+    if (s == null) return;
+    _nameController.text = s['name']?.toString() ?? '';
+    _priceController.text = s['price']?.toString() ?? '';
+    _durationController.text = s['duration']?.toString() ?? '';
+    _longevityController.text = s['longevity']?.toString() ?? '';
+    _descriptionController.text = s['description']?.toString() ?? '';
+    _subcategoryController.text = s['subcategory']?.toString() ?? '';
+    final tags = s['tags'];
+    _tagsController.text = tags is List ? tags.join(', ') : (tags?.toString() ?? '');
+    _priceMaxController.text = s['priceMax']?.toString() ?? '';
+    _isFeatured = s['isFeatured'] == true;
+    _isActive = s['isActive'] != false; // default true when absent
+    final gender = s['gender']?.toString();
+    if (gender == 'women' || gender == 'men') _selectedGender = gender!;
+    final legacyCat = s['category']?.toString();
+    if (legacyCat != null && _categories.contains(legacyCat)) {
+      _selectedCategory = legacyCat;
+    }
+    final custom = s['customCategory'];
+    _selectedCustomCategoryId = s['categoryId']?.toString() ??
+        (custom is Map ? custom['id']?.toString() : null);
+    final img = s['imageUrl']?.toString() ?? s['image']?.toString();
+    if (img != null && img.isNotEmpty) {
+      _existingImageUrl = ApiClient.getImageUrl(img);
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final res = await AdminService.instance.getCatalogCategories();
+      final raw = res['data'] ?? res['items'] ?? res['categories'] ?? res;
+      final list = raw is List ? raw : <dynamic>[];
+      if (!mounted) return;
+      setState(() {
+        _customCategories = List<Map<String, dynamic>>.from(list.whereType<Map>());
+        _loadingCategories = false;
+      });
+    } catch (e) {
+      debugPrint('[Catalog] Failed to load categories: $e');
+      if (mounted) setState(() => _loadingCategories = false);
+    }
+  }
 
   static const _categories = ['wigs', 'braids', 'locs', 'curls', 'fades', 'twists', 'weaves', 'natural', 'cornrows', 'updos', 'color'];
   static const _categoryIcons = {
@@ -676,6 +819,8 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
     _subcategoryController.dispose();
     _tagsController.dispose();
     _priceMaxController.dispose();
+    _longevityController.dispose();
+    _durationController.dispose();
     super.dispose();
   }
 
@@ -736,8 +881,9 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
   }
 
   Future<void> _handleSave() async {
-    // Validation
-    if (_imageFile == null) {
+    // Validation — an image is required to create, but on edit the existing
+    // one is kept when no new image is picked.
+    if (_imageFile == null && _existingImageUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(tr('imageRequired')), backgroundColor: AppTheme.accentRed),
       );
@@ -749,12 +895,7 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
       );
       return;
     }
-    if (_priceController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tr('priceRequired')), backgroundColor: AppTheme.accentRed),
-      );
-      return;
-    }
+    // Price, duration and longevity are all optional — no validation here.
 
     setState(() => _isSaving = true);
 
@@ -765,10 +906,25 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
       final fields = <String, String>{
         'name': name,
         'nameKey': nameKey,
-        'price': _priceController.text.trim(),
         'gender': _selectedGender,
         'category': _selectedCategory,
       };
+      // The three per-style inputs are all optional — only send when filled.
+      if (_priceController.text.trim().isNotEmpty) {
+        fields['price'] = _priceController.text.trim();
+      }
+      if (_durationController.text.trim().isNotEmpty) {
+        fields['duration'] = _durationController.text.trim();
+      }
+      if (_longevityController.text.trim().isNotEmpty) {
+        fields['longevity'] = _longevityController.text.trim();
+      }
+      if (_selectedCustomCategoryId != null) {
+        fields['categoryId'] = _selectedCustomCategoryId!;
+      } else if (_isEdit) {
+        // Explicitly detach the style from its category (empty = uncategorize).
+        fields['categoryId'] = '';
+      }
       if (_descriptionController.text.trim().isNotEmpty) {
         fields['description'] = _descriptionController.text.trim();
       }
@@ -784,15 +940,24 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
       fields['isFeatured'] = _isFeatured.toString();
       fields['isActive'] = _isActive.toString();
 
-      await AdminService.instance.createStyleWithImage(
-        imageFile: _imageFile!,
-        fields: fields,
-      );
+      if (_isEdit) {
+        // Keep the existing image when no new one was picked.
+        await AdminService.instance.updateStyleWithImage(
+          _editId,
+          imageFile: _imageFile,
+          fields: fields,
+        );
+      } else {
+        await AdminService.instance.createStyleWithImage(
+          imageFile: _imageFile!,
+          fields: fields,
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(tr('styleCreated')),
+            content: Text(_isEdit ? tr('styleUpdated') : tr('styleCreated')),
             backgroundColor: AppTheme.accentGreen,
           ),
         );
@@ -800,12 +965,12 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
         Navigator.pop(context);
       }
     } catch (e) {
-      debugPrint('Failed to create style: $e');
+      debugPrint('Failed to save style: $e');
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(tr('styleCreateError')),
+            content: Text(_isEdit ? tr('styleUpdateError') : tr('styleCreateError')),
             backgroundColor: AppTheme.accentRed,
           ),
         );
@@ -848,7 +1013,7 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      tr('createNewStyle'),
+                      _isEdit ? tr('editStyle') : tr('createNewStyle'),
                       style: AppTheme.displayFont.copyWith(
                         fontSize: 22,
                         color: AppTheme.getTextPrimary(context),
@@ -886,18 +1051,27 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
                           color: AppTheme.getBgSecondary(context),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: _imageFile != null
+                            color: (_imageFile != null || _existingImageUrl != null)
                                 ? AppTheme.getGold(context).withValues(alpha: 0.4)
                                 : AppTheme.getBorder(context),
-                            width: _imageFile != null ? 2 : 1,
+                            width: (_imageFile != null || _existingImageUrl != null) ? 2 : 1,
                           ),
                         ),
                         clipBehavior: Clip.antiAlias,
-                        child: _imageFile != null
+                        child: (_imageFile != null || _existingImageUrl != null)
                             ? Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  Image.memory(_imageBytes!, fit: BoxFit.cover),
+                                  if (_imageFile != null)
+                                    Image.memory(_imageBytes!, fit: BoxFit.cover)
+                                  else
+                                    Image.network(_existingImageUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, _, _) => Container(
+                                              color: AppTheme.getBgSecondary(context),
+                                              child: Icon(Icons.image_not_supported,
+                                                  color: AppTheme.getTextTertiary(context)),
+                                            )),
                                   Positioned(
                                     bottom: 8,
                                     right: 8,
@@ -957,8 +1131,8 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
 
                     const SizedBox(height: 20),
 
-                    // ── Price ──
-                    _buildLabel(tr('priceLabel')),
+                    // ── Price (optional) ──
+                    _buildLabel('${tr('priceLabel')} (${tr('optional')})'),
                     const SizedBox(height: 8),
                     _buildTextField(
                       controller: _priceController,
@@ -973,6 +1147,34 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 20),
+
+                    // ── Time it takes (duration, optional) ──
+                    _buildLabel('${tr('durationLabel')} (${tr('optional')})'),
+                    const SizedBox(height: 8),
+                    _buildTextField(
+                      controller: _durationController,
+                      hint: tr('durationHint'),
+                      keyboardType: TextInputType.number,
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // ── How long it lasts (longevity, optional) ──
+                    _buildLabel('${tr('longevityLabel')} (${tr('optional')})'),
+                    const SizedBox(height: 8),
+                    _buildTextField(
+                      controller: _longevityController,
+                      hint: tr('longevityHint'),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // ── Custom Category (salon-defined, optional) ──
+                    _buildLabel('${tr('customCategoryLabel')} (${tr('optional')})'),
+                    const SizedBox(height: 8),
+                    _buildCustomCategoryPicker(),
 
                     const SizedBox(height: 20),
 
@@ -1149,7 +1351,7 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
                                     ),
                                     const SizedBox(width: 12),
                                     Text(
-                                      tr('creatingStyle'),
+                                      _isEdit ? tr('savingStyle') : tr('creatingStyle'),
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w600,
@@ -1159,7 +1361,7 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
                                   ],
                                 )
                               : Text(
-                                  tr('createNewStyle'),
+                                  _isEdit ? tr('saveChanges') : tr('createNewStyle'),
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -1230,6 +1432,67 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
           border: InputBorder.none,
         ),
       ),
+    );
+  }
+
+  Widget _buildCustomCategoryPicker() {
+    if (_loadingCategories) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    if (_customCategories.isEmpty) {
+      return Text(
+        tr('noCategoriesYet'),
+        style: TextStyle(fontSize: 12, color: AppTheme.getTextTertiary(context)),
+      );
+    }
+    // "None" chip + one chip per category.
+    final options = <(String?, String)>[
+      (null, tr('noneOption')),
+      ..._customCategories.map((c) =>
+          (c['id']?.toString(), c['name']?.toString() ?? '')),
+    ];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: options.map((opt) {
+        final id = opt.$1;
+        final label = opt.$2;
+        final isSelected = _selectedCustomCategoryId == id;
+        return GestureDetector(
+          onTap: () => setState(() => _selectedCustomCategoryId = id),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? AppTheme.getGoldDim(context)
+                  : AppTheme.getBgGlass(context),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSelected
+                    ? AppTheme.getGold(context).withValues(alpha: 0.5)
+                    : AppTheme.getBorder(context),
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isSelected
+                    ? AppTheme.getGold(context)
+                    : AppTheme.getTextSecondary(context),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -1325,4 +1588,355 @@ class _DashedBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ═══════════════════════════════════════════════════════
+//  Manage Categories Bottom Sheet
+// ═══════════════════════════════════════════════════════
+
+class _ManageCategoriesSheet extends StatefulWidget {
+  const _ManageCategoriesSheet();
+
+  @override
+  State<_ManageCategoriesSheet> createState() => _ManageCategoriesSheetState();
+}
+
+class _ManageCategoriesSheetState extends State<_ManageCategoriesSheet> {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _categories = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final res = await AdminService.instance.getCatalogCategories();
+      final raw = res['data'] ?? res['items'] ?? res['categories'] ?? res;
+      final list = raw is List ? raw : <dynamic>[];
+      if (!mounted) return;
+      setState(() {
+        _categories = List<Map<String, dynamic>>.from(list.whereType<Map>());
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _openEditor({Map<String, dynamic>? existing}) async {
+    final isEdit = existing != null;
+    final nameCtrl =
+        TextEditingController(text: existing?['name']?.toString() ?? '');
+    final descCtrl =
+        TextEditingController(text: existing?['description']?.toString() ?? '');
+    bool busy = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          Future<void> submit() async {
+            if (nameCtrl.text.trim().isEmpty) return;
+            setLocal(() => busy = true);
+            try {
+              final body = <String, dynamic>{
+                'name': nameCtrl.text.trim(),
+                if (descCtrl.text.trim().isNotEmpty)
+                  'description': descCtrl.text.trim(),
+              };
+              if (isEdit) {
+                await AdminService.instance
+                    .updateCatalogCategory(existing['id'].toString(), body);
+              } else {
+                await AdminService.instance.createCatalogCategory(body);
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(tr('categorySaved')),
+                  backgroundColor: AppTheme.accentGreen,
+                ));
+              }
+              await _load();
+            } catch (e) {
+              debugPrint('[Catalog] Failed to save category: $e');
+              setLocal(() => busy = false);
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                  content: Text(tr('categorySaveError')),
+                  backgroundColor: AppTheme.accentRed,
+                ));
+              }
+            }
+          }
+
+          return AlertDialog(
+            backgroundColor: AppTheme.getBgSecondary(ctx),
+            title: Text(
+              isEdit ? tr('editCategory') : tr('addCategory'),
+              style: TextStyle(color: AppTheme.getTextPrimary(ctx), fontSize: 18),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  autofocus: true,
+                  style: TextStyle(color: AppTheme.getTextPrimary(ctx)),
+                  decoration: InputDecoration(
+                    labelText: tr('categoryNameLabel'),
+                    labelStyle:
+                        TextStyle(color: AppTheme.getTextSecondary(ctx)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  style: TextStyle(color: AppTheme.getTextPrimary(ctx)),
+                  decoration: InputDecoration(
+                    labelText: '${tr('categoryDescLabel')} (${tr('optional')})',
+                    labelStyle:
+                        TextStyle(color: AppTheme.getTextSecondary(ctx)),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: busy ? null : () => Navigator.pop(ctx),
+                child: Text(tr('cancel'),
+                    style: TextStyle(color: AppTheme.getTextSecondary(ctx))),
+              ),
+              TextButton(
+                onPressed: busy ? null : submit,
+                child: busy
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(tr('save'),
+                        style: TextStyle(
+                            color: AppTheme.getGold(ctx),
+                            fontWeight: FontWeight.w600)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    nameCtrl.dispose();
+    descCtrl.dispose();
+  }
+
+  Future<void> _delete(Map<String, dynamic> category) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.getBgSecondary(ctx),
+        title: Text(tr('deleteCategoryTitle'),
+            style: TextStyle(color: AppTheme.getTextPrimary(ctx))),
+        content: Text(tr('deleteCategoryMsg'),
+            style: TextStyle(color: AppTheme.getTextSecondary(ctx))),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(tr('cancel'),
+                style: TextStyle(color: AppTheme.getTextSecondary(ctx))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(tr('delete'),
+                style: const TextStyle(color: AppTheme.accentRed)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await AdminService.instance
+          .deleteCatalogCategory(category['id'].toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('categoryDeleted')),
+          backgroundColor: AppTheme.accentGreen,
+        ));
+      }
+      await _load();
+    } catch (e) {
+      debugPrint('[Catalog] Failed to delete category: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: AppTheme.getBgPrimary(context),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 4),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.getTextTertiary(context),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      tr('manageCategories'),
+                      style: AppTheme.displayFont.copyWith(
+                        fontSize: 22,
+                        color: AppTheme.getTextPrimary(context),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => _openEditor(),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.getGold(context),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.add, size: 18, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Text(tr('errorLoadingCatalog'),
+                                  style: TextStyle(
+                                      color: AppTheme.getTextSecondary(context))),
+                            ),
+                          )
+                        : _categories.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.folder_open,
+                                        size: 44,
+                                        color: AppTheme.getTextTertiary(context)),
+                                    const SizedBox(height: 10),
+                                    Text(tr('noCategoriesYet'),
+                                        style: TextStyle(
+                                            color: AppTheme.getTextSecondary(
+                                                context))),
+                                  ],
+                                ),
+                              )
+                            : ListView.separated(
+                                controller: scrollController,
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                                itemCount: _categories.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 8),
+                                itemBuilder: (context, i) {
+                                  final c = _categories[i];
+                                  final count = c['styleCount'] ?? 0;
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.getBgSecondary(context),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color: AppTheme.getBorder(context)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                c['name']?.toString() ?? '',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppTheme.getTextPrimary(
+                                                      context),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                '$count ${tr('stylesCount')}',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: AppTheme.getTextTertiary(
+                                                      context),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: () =>
+                                              _openEditor(existing: c),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(6),
+                                            child: Icon(Icons.edit_outlined,
+                                                size: 18,
+                                                color: AppTheme.getTextSecondary(
+                                                    context)),
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: () => _delete(c),
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(6),
+                                            child: Icon(Icons.delete_outline,
+                                                size: 18,
+                                                color: AppTheme.accentRed),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }

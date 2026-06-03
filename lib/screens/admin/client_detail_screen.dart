@@ -36,7 +36,9 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     try {
       final res = await AdminService.instance.getLoyaltyClient(widget.clientId);
       debugPrint('[ClientDetail] response keys=${res.keys.toList()}');
-      final data = (res['data'] ?? res) as Map<String, dynamic>;
+      // Unwrap a { data: {...} } envelope only when data is actually a Map.
+      final rawData = res['data'];
+      final data = rawData is Map<String, dynamic> ? rawData : res;
       if (!mounted) return;
       setState(() {
         _client = data;

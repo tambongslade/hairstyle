@@ -73,9 +73,20 @@ class _ClientsScreenState extends State<ClientsScreen> {
         search: _searchTerm.isEmpty ? null : _searchTerm,
       );
       debugPrint('[Clients] response keys=${res.keys.toList()}');
-      final data = (res['data'] ?? res) as Map<String, dynamic>;
-      final items = (data['clients'] ?? data['items'] ?? data['data'] ?? []) as List;
-      final total = (data['totalPages'] ?? data['pages'] ?? 1) as int;
+      // The roster can arrive in two shapes:
+      //   A) { data: [ ...clients... ], total, page, totalPages }  ← list at top
+      //   B) { data: { clients: [...], totalPages } }              ← nested envelope
+      // Pull the list and the pagination info without assuming either.
+      dynamic listSource = res['clients'] ?? res['items'] ?? res['data'] ?? [];
+      Map<String, dynamic> pageInfo = res;
+      if (listSource is Map) {
+        pageInfo = Map<String, dynamic>.from(listSource);
+        listSource =
+            pageInfo['clients'] ?? pageInfo['items'] ?? pageInfo['data'] ?? [];
+      }
+      final items = listSource is List ? listSource : const <dynamic>[];
+      final totalRaw = pageInfo['totalPages'] ?? pageInfo['pages'] ?? 1;
+      final total = totalRaw is int ? totalRaw : int.tryParse('$totalRaw') ?? 1;
       final fetched = List<Map<String, dynamic>>.from(items.whereType<Map>());
       debugPrint('[Clients] parsed items=${fetched.length} totalPages=$total '
           '(reset=$reset)');

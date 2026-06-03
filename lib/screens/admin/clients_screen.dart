@@ -298,9 +298,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
     final id = c['id']?.toString() ?? '';
     final name = (c['clientName'] ?? c['name'] ?? '').toString();
     final phone = (c['clientPhone'] ?? c['phone'] ?? '').toString();
-    final points = c['points'] ?? 0;
-    final tier = (c['tier'] ?? 'bronze').toString();
-    final visits = c['visits'] ?? 0;
+    final points = c['totalPoints'] ?? c['points'] ?? 0;
+    final tier = (c['loyaltyTier'] ?? c['tier'] ?? 'bronze').toString();
+    final visits = c['visits'] ?? c['totalVisits'] ?? 0;
 
     return GlassCard(
       margin: const EdgeInsets.only(bottom: 10),

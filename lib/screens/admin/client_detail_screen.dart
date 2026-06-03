@@ -149,9 +149,9 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
     final name = (c['clientName'] ?? c['name'] ?? '').toString();
     final phone = (c['clientPhone'] ?? c['phone'] ?? '').toString();
     final email = (c['clientEmail'] ?? c['email'] ?? '').toString();
-    final points = c['points'] ?? 0;
-    final tier = (c['tier'] ?? 'bronze').toString();
-    final visits = c['visits'] ?? 0;
+    final points = c['totalPoints'] ?? c['points'] ?? 0;
+    final tier = (c['loyaltyTier'] ?? c['tier'] ?? 'bronze').toString();
+    final visits = c['visits'] ?? c['totalVisits'] ?? 0;
     final punch = c['punchCard'] as Map<String, dynamic>?;
     final activities = (c['activities'] ?? c['history'] ?? []) as List;
 

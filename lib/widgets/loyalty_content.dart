@@ -12,9 +12,12 @@ class LoyaltyContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final points = data['points'] ?? 0;
-    final tier = (data['tier'] ?? 'bronze').toString();
-    final visits = data['visits'] ?? 0;
+    // Field names vary by endpoint: the public lookup / me-loyalty payloads use
+    // totalPoints/loyaltyTier, while older responses use points/tier. Accept both.
+    final points = data['totalPoints'] ?? data['points'] ?? 0;
+    final tier =
+        (data['loyaltyTier'] ?? data['tier'] ?? 'bronze').toString();
+    final visits = data['visits'] ?? data['totalVisits'] ?? 0;
     final pointsToNext =
         data['pointsToNextTier'] ?? data['tierProgress']?['pointsToNextTier'];
     final nextTier = data['nextTier'] ?? data['tierProgress']?['nextTier'];

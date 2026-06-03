@@ -72,6 +72,7 @@ class _AdminSettingsState extends State<AdminSettings> {
       _fetchLoyaltyConfig(),
     ]);
 
+    if (!mounted) return;
     setState(() => _loading = false);
   }
 
@@ -79,6 +80,7 @@ class _AdminSettingsState extends State<AdminSettings> {
     try {
       final res = await AdminService.instance.getSalon();
       final data = res['data'] as Map<String, dynamic>? ?? res;
+      if (!mounted) return;
       setState(() {
         _salonName = data['name']?.toString() ?? _salonName;
         // Backend canonical field is `location`; accept legacy `address` too.
@@ -107,6 +109,7 @@ class _AdminSettingsState extends State<AdminSettings> {
       final raw = res['stylists'] ?? res['data'] ?? res;
       final data = raw is List ? raw : (raw is Map ? (raw['stylists'] ?? []) : []);
       if (data is List && data.isNotEmpty) {
+        if (!mounted) return;
         setState(() {
           _stylists = List<Map<String, dynamic>>.from(data);
         });
@@ -120,6 +123,7 @@ class _AdminSettingsState extends State<AdminSettings> {
     try {
       final res = await AdminService.instance.getSubscription();
       final data = res['data'] as Map<String, dynamic>? ?? res;
+      if (!mounted) return;
       setState(() {
         final plan = data['plan'] ?? data['name'] ?? 'Pro Plan';
         _subscriptionPlan = plan.toString();
@@ -133,6 +137,7 @@ class _AdminSettingsState extends State<AdminSettings> {
     try {
       final res = await AdminService.instance.getLoyaltyConfig();
       final data = res['data'] as Map<String, dynamic>? ?? res;
+      if (!mounted) return;
       setState(() {
         _pointsPer500 = data['pointsPer500']?.toString() ?? data['points_per_500']?.toString() ?? '';
         _punchCardVal = data['punchCard']?.toString() ?? data['punch_card']?.toString() ?? '';

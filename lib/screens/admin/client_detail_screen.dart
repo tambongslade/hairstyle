@@ -32,15 +32,24 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
       _loading = true;
       _error = null;
     });
+    debugPrint('[ClientDetail] GET /admin/loyalty/clients/${widget.clientId}');
     try {
       final res = await AdminService.instance.getLoyaltyClient(widget.clientId);
+      debugPrint('[ClientDetail] response keys=${res.keys.toList()}');
       final data = (res['data'] ?? res) as Map<String, dynamic>;
       if (!mounted) return;
       setState(() {
         _client = data;
         _loading = false;
       });
-    } catch (e) {
+    } catch (e, st) {
+      if (e is ApiException) {
+        debugPrint('[ClientDetail] API ERROR status=${e.statusCode} '
+            'message="${e.message}" errors=${e.errors}');
+      } else {
+        debugPrint('[ClientDetail] ERROR: $e');
+      }
+      debugPrintStack(stackTrace: st, label: '[ClientDetail] _load');
       if (!mounted) return;
       setState(() {
         _loading = false;

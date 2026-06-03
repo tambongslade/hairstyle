@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../l10n/app_locale.dart';
 import '../../services/admin_service.dart';
+import '../../services/api_client.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/gold_button.dart';
@@ -62,17 +63,22 @@ class _ClientsScreenState extends State<ClientsScreen> {
         _appending = true;
       }
     });
+    final pageToFetch = reset ? 1 : _page + 1;
+    debugPrint('[Clients] GET /admin/loyalty/clients '
+        'page=$pageToFetch limit=20 search="${_searchTerm.isEmpty ? '' : _searchTerm}"');
     try {
-      final pageToFetch = reset ? 1 : _page + 1;
       final res = await AdminService.instance.getLoyaltyClients(
         page: pageToFetch,
         limit: 20,
         search: _searchTerm.isEmpty ? null : _searchTerm,
       );
+      debugPrint('[Clients] response keys=${res.keys.toList()}');
       final data = (res['data'] ?? res) as Map<String, dynamic>;
       final items = (data['clients'] ?? data['items'] ?? data['data'] ?? []) as List;
       final total = (data['totalPages'] ?? data['pages'] ?? 1) as int;
       final fetched = List<Map<String, dynamic>>.from(items.whereType<Map>());
+      debugPrint('[Clients] parsed items=${fetched.length} totalPages=$total '
+          '(reset=$reset)');
 
       if (!mounted) return;
       setState(() {
@@ -86,7 +92,16 @@ class _ClientsScreenState extends State<ClientsScreen> {
         _loading = false;
         _appending = false;
       });
-    } catch (e) {
+    } catch (e, st) {
+      // Surface the real cause in the console so we can diagnose the
+      // fidelity/loyalty error, not just the generic UI message.
+      if (e is ApiException) {
+        debugPrint('[Clients] API ERROR status=${e.statusCode} '
+            'message="${e.message}" errors=${e.errors}');
+      } else {
+        debugPrint('[Clients] ERROR: $e');
+      }
+      debugPrintStack(stackTrace: st, label: '[Clients] _fetch');
       if (!mounted) return;
       setState(() {
         _loading = false;

@@ -39,6 +39,10 @@ class _TryOnScreenState extends State<TryOnScreen>
   List<String> _subcategories = [];
   bool _loadingSubcategories = false;
 
+  // Salon custom category id → name. The catalogue (guest) response carries
+  // only `categoryId`, so we resolve the display name from this map.
+  Map<String, String> _categoryNames = {};
+
   // Styles from backend API
   List<Map<String, dynamic>> _allStyles = [];
   bool _loadingStyles = true;
@@ -138,6 +142,7 @@ class _TryOnScreenState extends State<TryOnScreen>
       }
     });
     _fetchStyles();
+    _loadCategoryNames();
     _connectSocket();
   }
 
@@ -209,6 +214,31 @@ class _TryOnScreenState extends State<TryOnScreen>
   void _disconnectSocket() {
     _socket?.dispose();
     _socket = null;
+  }
+
+  /// Load the salon's custom category id→name map so guest-mode styles (which
+  /// only carry `categoryId`) can show their category name in the chips.
+  Future<void> _loadCategoryNames() async {
+    final salonId = StorageService.instance.selectedSalonId;
+    if (salonId == null || salonId.isEmpty) return;
+    try {
+      final res = await PublicService.instance.getSalonCategories(salonId);
+      final raw = res['data'] ?? res['items'] ?? res['categories'] ?? res;
+      final list = raw is List
+          ? raw
+          : (raw is Map ? (raw['items'] ?? raw['categories'] ?? []) : []);
+      final map = <String, String>{};
+      for (final c in list.whereType<Map>()) {
+        final id = c['id']?.toString();
+        final name = c['name']?.toString();
+        if (id != null && id.isNotEmpty && name != null && name.isNotEmpty) {
+          map[id] = name;
+        }
+      }
+      if (mounted && map.isNotEmpty) setState(() => _categoryNames = map);
+    } catch (e) {
+      debugPrint('[TryOn] Failed to load category names: $e');
+    }
   }
 
   Future<void> _fetchStyles() async {
@@ -318,9 +348,17 @@ class _TryOnScreenState extends State<TryOnScreen>
   /// otherwise the legacy `category` enum. This is what drives the try-on
   /// chips, so newly created custom categories show up here automatically.
   String _effectiveCategory(Map<String, dynamic> s) {
+    // 1. Logged-in /styles embeds the full custom category object.
     final custom = s['customCategory'];
     final name = custom is Map ? custom['name']?.toString().trim() : null;
     if (name != null && name.isNotEmpty) return name;
+    // 2. Guest catalogue carries only categoryId — resolve via the salon map.
+    final catId = s['categoryId']?.toString();
+    if (catId != null && catId.isNotEmpty) {
+      final mapped = _categoryNames[catId]?.trim();
+      if (mapped != null && mapped.isNotEmpty) return mapped;
+    }
+    // 3. Fall back to the legacy category enum.
     return (s['category'] ?? '').toString();
   }
 

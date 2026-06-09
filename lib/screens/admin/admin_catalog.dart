@@ -796,20 +796,24 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
     }
   }
 
+  // Known legacy category slugs. Salons no longer choose these directly, but
+  // they still back-fill the required `category` field when a custom category
+  // happens to match a known type (e.g. a "Braids" category → "braids").
   static const _categories = ['wigs', 'braids', 'locs', 'curls', 'fades', 'twists', 'weaves', 'natural', 'cornrows', 'updos', 'color'];
-  static const _categoryIcons = {
-    'wigs': Icons.face_retouching_natural,
-    'braids': Icons.auto_awesome,
-    'locs': Icons.waves,
-    'curls': Icons.bubble_chart,
-    'fades': Icons.content_cut,
-    'twists': Icons.cyclone,
-    'weaves': Icons.layers,
-    'natural': Icons.eco,
-    'cornrows': Icons.view_day,
-    'updos': Icons.vertical_align_top,
-    'color': Icons.palette,
-  };
+
+  /// The legacy category enum value to send. Inferred from the selected custom
+  /// category's name when it maps to a known type; otherwise the style's
+  /// existing/default value (so the required backend field is always valid).
+  String _legacyCategoryToSend() {
+    for (final c in _customCategories) {
+      if (c['id']?.toString() == _selectedCustomCategoryId) {
+        final slug = (c['name']?.toString() ?? '').toLowerCase().trim();
+        if (_categories.contains(slug)) return slug;
+        break;
+      }
+    }
+    return _selectedCategory;
+  }
 
   @override
   void dispose() {
@@ -907,7 +911,10 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
         'name': name,
         'nameKey': nameKey,
         'gender': _selectedGender,
-        'category': _selectedCategory,
+        // The backend still requires a legacy category enum, but salons no
+        // longer pick one — it's inferred from the chosen custom category
+        // (falling back to the style's existing/default value).
+        'category': _legacyCategoryToSend(),
       };
       // The three per-style inputs are all optional — only send when filled.
       if (_priceController.text.trim().isNotEmpty) {
@@ -1191,64 +1198,6 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
 
                     const SizedBox(height: 20),
 
-                    // ── Category Chips ──
-                    _buildLabel(tr('category')),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 42,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _categories.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (ctx, i) {
-                          final cat = _categories[i];
-                          final isSelected = _selectedCategory == cat;
-                          final catKey = 'cat${cat[0].toUpperCase()}${cat.substring(1)}';
-                          return GestureDetector(
-                            onTap: () => setState(() => _selectedCategory = cat),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? AppTheme.getGoldDim(ctx)
-                                    : AppTheme.getBgGlass(ctx),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? AppTheme.getGold(ctx).withValues(alpha: 0.5)
-                                      : AppTheme.getBorder(ctx),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    _categoryIcons[cat] ?? Icons.style,
-                                    size: 16,
-                                    color: isSelected
-                                        ? AppTheme.getGold(ctx)
-                                        : AppTheme.getTextTertiary(ctx),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    tr(catKey),
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: isSelected
-                                          ? AppTheme.getGold(ctx)
-                                          : AppTheme.getTextSecondary(ctx),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
                     // ── Description (optional) ──
                     _buildLabel('${tr('descriptionLabel')} (${tr('optional')})'),
                     const SizedBox(height: 8),
@@ -1448,7 +1397,7 @@ class _CreateStyleSheetState extends State<_CreateStyleSheet> {
     }
     if (_customCategories.isEmpty) {
       return Text(
-        tr('noCategoriesYet'),
+        tr('addCategoriesHint'),
         style: TextStyle(fontSize: 12, color: AppTheme.getTextTertiary(context)),
       );
     }
@@ -1605,11 +1554,59 @@ class _ManageCategoriesSheetState extends State<_ManageCategoriesSheet> {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _categories = [];
+  bool _addingSuggestion = false;
+
+  /// The former hardcoded categories, now offered only as optional one-tap
+  /// suggestions: (slug, translation-key). A salon can add the ones it wants,
+  /// skip the rest, and create its own.
+  static const _suggested = <(String, String)>[
+    ('wigs', 'catWigs'),
+    ('braids', 'catBraids'),
+    ('locs', 'catLocs'),
+    ('curls', 'catCurls'),
+    ('fades', 'catFades'),
+    ('twists', 'catTwists'),
+    ('weaves', 'catWeaves'),
+    ('natural', 'catNatural'),
+    ('cornrows', 'catCornrows'),
+    ('updos', 'catUpdos'),
+    ('color', 'catColor'),
+  ];
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  Future<void> _addSuggested(String name) async {
+    if (_addingSuggestion) return;
+    setState(() => _addingSuggestion = true);
+    try {
+      await AdminService.instance.createCatalogCategory({'name': name});
+      await _load();
+    } catch (e) {
+      debugPrint('[Catalog] Failed to add suggested category: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('categorySaveError')),
+          backgroundColor: AppTheme.accentRed,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _addingSuggestion = false);
+    }
+  }
+
+  /// Suggested chips still worth offering (those whose label isn't already
+  /// an existing category, case-insensitively).
+  List<(String, String)> get _remainingSuggestions {
+    final existing = _categories
+        .map((c) => (c['name']?.toString() ?? '').toLowerCase().trim())
+        .toSet();
+    return _suggested
+        .where((s) => !existing.contains(tr(s.$2).toLowerCase().trim()))
+        .toList();
   }
 
   Future<void> _load() async {
@@ -1781,6 +1778,63 @@ class _ManageCategoriesSheetState extends State<_ManageCategoriesSheet> {
     }
   }
 
+  Widget _buildSuggestions() {
+    final remaining = _remainingSuggestions;
+    if (remaining.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            tr('suggestedCategories'),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.getTextSecondary(context),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: remaining.map((s) {
+              final label = tr(s.$2);
+              return GestureDetector(
+                onTap: _addingSuggestion ? null : () => _addSuggested(label),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.getBgGlass(context),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppTheme.getBorder(context)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add,
+                          size: 14, color: AppTheme.getGold(context)),
+                      const SizedBox(width: 5),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.getTextSecondary(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -1832,6 +1886,7 @@ class _ManageCategoriesSheetState extends State<_ManageCategoriesSheet> {
                   ],
                 ),
               ),
+              if (!_loading && _error == null) _buildSuggestions(),
               Expanded(
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())

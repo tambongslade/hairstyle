@@ -7,6 +7,7 @@ import '../../services/storage_service.dart';
 import '../../widgets/glass_card.dart';
 import '../../widgets/gold_button.dart';
 import 'client_fidelity_screen.dart';
+import 'my_appointments_screen.dart';
 import 'salon_auth_screen.dart';
 
 /// Salon catalogue (guest-facing). Single salon, no auth — everything is
@@ -172,6 +173,10 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
           _buildCtas(),
           const SizedBox(height: 14),
           _buildMyPointsRow(),
+          if (_isClientLoggedIn) ...[
+            const SizedBox(height: 10),
+            _buildMyAppointmentsRow(),
+          ],
           const SizedBox(height: 24),
           if (_styles.isNotEmpty) _buildStylesGrid(),
           if (_services.isNotEmpty) ...[
@@ -399,6 +404,73 @@ class _CatalogueScreenState extends State<CatalogueScreen> {
                       loggedIn
                           ? tr('trackTierRewards')
                           : tr('signInToEarn'),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.getTextSecondary(context),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_rounded,
+                  size: 16, color: AppTheme.getTextTertiary(context)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAppointments() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const MyAppointmentsScreen()),
+    );
+    if (mounted) setState(() {});
+  }
+
+  /// Quick access to the signed-in customer's bookings at this salon.
+  Widget _buildMyAppointmentsRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: _openAppointments,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.getBgGlass(context),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.getBorder(context)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.getGold(context).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.event_note_rounded,
+                    color: AppTheme.getGold(context), size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tr('myAppointments'),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.getTextPrimary(context),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      tr('myAppointmentsSub'),
                       style: TextStyle(
                         fontSize: 11,
                         color: AppTheme.getTextSecondary(context),

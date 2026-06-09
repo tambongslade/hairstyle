@@ -314,12 +314,22 @@ class _TryOnScreenState extends State<TryOnScreen>
     }
   }
 
+  /// A style's effective category: the salon's custom category name when set,
+  /// otherwise the legacy `category` enum. This is what drives the try-on
+  /// chips, so newly created custom categories show up here automatically.
+  String _effectiveCategory(Map<String, dynamic> s) {
+    final custom = s['customCategory'];
+    final name = custom is Map ? custom['name']?.toString().trim() : null;
+    if (name != null && name.isNotEmpty) return name;
+    return (s['category'] ?? '').toString();
+  }
+
   List<Map<String, dynamic>> get _filteredStyles {
     return _allStyles.where((s) {
       final gender = (s['gender'] ?? '').toString().toLowerCase();
       if (gender != _selectedGender) return false;
       if (_selectedCategory != 'all') {
-        final category = (s['category'] ?? '').toString().toLowerCase();
+        final category = _effectiveCategory(s).toLowerCase();
         if (category != _selectedCategory) return false;
       }
       if (_selectedSubcategory != null) {
@@ -338,7 +348,7 @@ class _TryOnScreenState extends State<TryOnScreen>
         });
     final cats = <String>{'all'};
     for (final s in genderStyles) {
-      final cat = (s['category'] ?? '').toString().toLowerCase();
+      final cat = _effectiveCategory(s).toLowerCase();
       if (cat.isNotEmpty) cats.add(cat);
     }
     return cats.toList();
@@ -361,7 +371,14 @@ class _TryOnScreenState extends State<TryOnScreen>
 
   String _categoryLabel(String cat) {
     final key = _categoryLabelKeys[cat];
-    return key != null ? tr(key) : cat[0].toUpperCase() + cat.substring(1);
+    if (key != null) return tr(key);
+    if (cat.isEmpty) return cat;
+    // Custom category: title-case each word for display.
+    return cat
+        .split(' ')
+        .where((w) => w.isNotEmpty)
+        .map((w) => w[0].toUpperCase() + w.substring(1))
+        .join(' ');
   }
 
   static const _categoryIcons = <String, IconData>{
@@ -1959,7 +1976,7 @@ class _TryOnScreenState extends State<TryOnScreen>
           final imageUrl = ApiClient.getImageUrl(style['imageUrl']?.toString() ?? style['image']?.toString());
           final styleName = style['name']?.toString() ?? '';
           final stylePrice = style['price']?.toString() ?? '';
-          final styleCategory = (style['category'] ?? '').toString().toLowerCase();
+          final styleCategory = _effectiveCategory(style).toLowerCase();
           final styleSubcategory = style['subcategory']?.toString();
           final isFeaturedStyle = style['isFeatured'] == true;
 

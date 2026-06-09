@@ -4,6 +4,7 @@ import '../../services/api_client.dart';
 import '../../services/public_service.dart';
 import '../../services/storage_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/auth_error_dialog.dart';
 import '../../widgets/gold_button.dart';
 import 'guest_loyalty_screen.dart';
 
@@ -89,12 +90,21 @@ class _SalonAuthScreenState extends State<SalonAuthScreen> {
         _submitting = false;
         _error = e.message;
       });
+      // A modal makes the failure (e.g. email already registered) impossible
+      // to miss. While signing up, 409 offers a one-tap switch to login.
+      AuthErrorDialog.show(
+        context,
+        e,
+        onLoginInstead:
+            _isSignup ? () => setState(() => _isSignup = false) : null,
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _submitting = false;
         _error = e.toString();
       });
+      AuthErrorDialog.show(context, e);
     }
   }
 

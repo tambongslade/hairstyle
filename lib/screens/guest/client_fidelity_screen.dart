@@ -7,6 +7,7 @@ import '../../services/storage_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/gold_button.dart';
 import '../../widgets/loyalty_content.dart';
+import 'my_appointments_screen.dart';
 
 /// Fidelity page for a signed-in customer at the current salon. Reads
 /// /public/salons/:salonId/me/loyalty with the Bearer token. Includes a
@@ -127,6 +128,14 @@ class _ClientFidelityScreenState extends State<ClientFidelityScreen> {
         ),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: Icon(Icons.event_note_rounded,
+                color: AppTheme.getTextSecondary(context), size: 20),
+            tooltip: tr('myAppointments'),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MyAppointmentsScreen()),
+            ),
+          ),
           IconButton(
             icon: Icon(Icons.logout_rounded,
                 color: AppTheme.getTextSecondary(context), size: 20),

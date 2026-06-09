@@ -97,9 +97,25 @@ class ApiClient {
 
     throw ApiException(
       response.statusCode,
-      body['message']?.toString() ?? 'Unknown error',
+      _normalizeMessage(body['message']),
       errors: body['errors'] as Map<String, dynamic>?,
     );
+  }
+
+  /// NestJS returns `message` as a plain string for thrown exceptions
+  /// (e.g. 409 Conflict → "Email already registered") but as an array of
+  /// strings for validation failures (400 → one entry per failed rule).
+  /// Flatten both shapes into a single human-readable string.
+  String _normalizeMessage(dynamic message) {
+    if (message == null) return 'Unknown error';
+    if (message is List) {
+      final lines = message
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty);
+      final joined = lines.join('\n');
+      return joined.isEmpty ? 'Unknown error' : joined;
+    }
+    return message.toString();
   }
 
   void _redirectToLogin() {

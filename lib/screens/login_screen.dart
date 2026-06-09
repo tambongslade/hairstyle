@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../l10n/app_locale.dart';
 import '../services/auth_service.dart';
 import '../services/api_client.dart';
+import '../widgets/auth_error_dialog.dart';
 import 'admin/admin_shell.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -464,26 +465,6 @@ class _RegisterSheetState extends State<_RegisterSheet> {
     );
   }
 
-  /// Turn any thrown error into a human-readable message, surfacing backend
-  /// validation details (NestJS often returns them as a list or an `errors`
-  /// map) instead of swallowing them.
-  String _describeError(Object e) {
-    if (e is ApiException) {
-      final parts = <String>[];
-      if (e.message.trim().isNotEmpty) parts.add(e.message.trim());
-      final errs = e.errors;
-      if (errs != null && errs.isNotEmpty) {
-        errs.forEach((k, v) {
-          final val = v is List ? v.join(', ') : '$v';
-          parts.add('$k: $val');
-        });
-      }
-      final joined = parts.join(' — ');
-      return joined.isEmpty ? 'Error ${e.statusCode}' : joined;
-    }
-    return e.toString();
-  }
-
   bool _validatePersonalStep() {
     if (_nameCtrl.text.trim().isEmpty ||
         _emailCtrl.text.trim().isEmpty ||
@@ -577,12 +558,19 @@ class _RegisterSheetState extends State<_RegisterSheet> {
           'message="${e.message}" errors=${e.errors}');
       debugPrintStack(stackTrace: st, label: '[SalonSignup]');
       if (!mounted) return;
-      _snack(_describeError(e));
+      // Surface the failure in a modal the user can't miss. On an
+      // already-registered email, "Log in instead" closes the sheet so the
+      // user lands back on the login screen.
+      AuthErrorDialog.show(
+        context,
+        e,
+        onLoginInstead: () => Navigator.of(context).pop(),
+      );
     } catch (e, st) {
       debugPrint('[SalonSignup] ERROR: $e');
       debugPrintStack(stackTrace: st, label: '[SalonSignup]');
       if (!mounted) return;
-      _snack(_describeError(e));
+      AuthErrorDialog.show(context, e);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
